@@ -174,9 +174,19 @@ function Login() {
     e.preventDefault();
     setBusy(true);
     setError("");
-    const { error } = await getBrowserClient().auth.signInWithPassword({ email, password });
-    if (error) setError("E-mail ou mot de passe incorrect.");
-    setBusy(false);
+    
+const { error } = await getBrowserClient().auth.signInWithPassword({
+  email: email.trim(),
+  password,
+});
+
+if (error) {
+  console.error("Erreur Supabase Auth :", error.message);
+  setError(error.message);
+}
+
+setBusy(false);
+
   }
 
   return (
