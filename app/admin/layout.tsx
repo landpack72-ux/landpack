@@ -1,0 +1,11 @@
+import type { Metadata } from "next";
+
+export const metadata: Metadata = {
+  title: "Admin — Landpack",
+  robots: { index: false, follow: false },
+  alternates: { canonical: "/admin" },
+};
+
+export default function AdminLayout({ children }: { children: React.ReactNode }) {
+  return <div className="min-h-screen bg-cream text-ink">{children}</div>;
+}
