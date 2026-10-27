@@ -1,11 +1,11 @@
-import { getSettings } from "@/lib/data";
+import { getProducts, getSettings, getText } from "@/lib/data";
 import { formatPhone, telHref, waHref } from "@/lib/format";
 import LandpackLogo from "./LandpackLogo";
 
 const YEAR = new Date().getFullYear();
 
 export default async function Footer() {
-  const s = await getSettings();
+  const [s, t, products] = await Promise.all([getSettings(), getText("global.footer"), getProducts()]);
   return (
     <footer className="bg-water-dark px-4 sm:px-6 pb-8 pt-14 sm:pt-16 text-cream lg:px-10">
       <div className="mx-auto max-w-7xl">
@@ -19,26 +19,24 @@ export default async function Footer() {
               </span>
             </div>
             <p className="mt-4 max-w-xs font-body text-sm text-cream/70">
-              Emballages alimentaires personnalisés — sacs kraft et gobelets
-              transparents imprimés à Casablanca.
+              {t.tagline}
             </p>
           </div>
 
           <div>
             <p className="font-mono text-xs uppercase tracking-wide text-cream/50">
-              Produits
+              {t.products_title}
             </p>
             <ul className="mt-4 space-y-2 font-body text-sm text-cream/80">
-              <li><a href="/personnalisation" className="hover:text-gold">Sacs kraft</a></li>
-              <li><a href="/personnalisation" className="hover:text-gold">Sacs non tissés</a></li>
-              <li><a href="/personnalisation" className="hover:text-gold">Boîtes kraft</a></li>
-              <li><a href="/personnalisation" className="hover:text-gold">Gobelets</a></li>
+              {products.map((p) => (
+                <li key={p.id ?? p.name}><a href="/personnalisation" className="hover:text-gold">{p.name}</a></li>
+              ))}
             </ul>
           </div>
 
           <div>
             <p className="font-mono text-xs uppercase tracking-wide text-cream/50">
-              Atelier
+              {t.workshop_title}
             </p>
             <ul className="mt-4 space-y-2 font-body text-sm text-cream/80">
               <li>{s.address}</li>
@@ -57,11 +55,15 @@ export default async function Footer() {
 
           <div>
             <p className="font-mono text-xs uppercase tracking-wide text-cream/50">
-              Suivez l&apos;atelier
+              {t.social_title}
             </p>
             <ul className="mt-4 space-y-2 font-body text-sm text-cream/80">
-              <li><a href="#" className="hover:text-gold">Instagram</a></li>
-              <li><a href="#" className="hover:text-gold">Facebook</a></li>
+              {t.instagram_url && (
+                <li><a href={t.instagram_url} target="_blank" rel="noopener noreferrer" className="hover:text-gold">Instagram</a></li>
+              )}
+              {t.facebook_url && (
+                <li><a href={t.facebook_url} target="_blank" rel="noopener noreferrer" className="hover:text-gold">Facebook</a></li>
+              )}
               <li><a href={waHref(s.whatsapp)} target="_blank" rel="noopener noreferrer" className="hover:text-gold">WhatsApp</a></li>
             </ul>
           </div>
@@ -69,7 +71,7 @@ export default async function Footer() {
 
         <div className="mt-14 flex flex-col items-start justify-between gap-4 border-t-2 border-dashed border-cream/20 pt-6 font-mono text-xs text-cream/50 sm:flex-row sm:items-center">
           <p>© {YEAR} Landpack. Tous droits réservés.</p>
-          <p>Imprimé avec soin, un tampon à la fois.</p>
+          <p>{t.note}</p>
         </div>
       </div>
     </footer>

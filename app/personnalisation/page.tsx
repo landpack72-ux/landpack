@@ -1,4 +1,3 @@
-import { getProducts } from "@/lib/data";
 import type { Metadata } from "next";
 import Header from "../components/Header";
 import Footer from "../components/Footer";
@@ -6,68 +5,40 @@ import SubPageHero from "../components/SubPageHero";
 import SubPageCta from "../components/SubPageCta";
 import ShowcaseGallery from "../components/ShowcaseGallery";
 import StampBadge from "../components/StampBadge";
+import { getList, getProducts, getText } from "@/lib/data";
+import { pageMetadata } from "@/lib/seo";
 
-export const metadata: Metadata = {
-  title: "Personnalisation — Landpack",
-  description:
-    "Sacs kraft, sacs non tissés, boîtes et gobelets personnalisés à votre logo et vos couleurs.",
-  alternates: {
-    canonical: "/personnalisation",
-  },
-  openGraph: {
-    title: "Personnalisation — Landpack",
-    description:
-      "Sacs kraft, sacs non tissés, boîtes et gobelets personnalisés à votre logo et vos couleurs.",
-    url: "/personnalisation",
-  },
-};
-
-const SHOWCASE = [
-  {
-    src: "/images/perso1.webp",
-    alt: "Boîtes kraft personnalisées Landpack",
-    caption: "Boîtes kraft — repas à emporter, robustes et personnalisables",
-  },
-  {
-    src: "/images/perso2.webp",
-    alt: "Sacs personnalisés colorés Landpack",
-    caption: "Sacs — vos couleurs, votre logo, bien visible",
-  },
-  {
-    src: "/images/perso3.webp",
-    alt: "Housses vêtements personnalisées Landpack",
-    caption: "Housses — pour le textile et le pressing",
-  },
-];
+export async function generateMetadata(): Promise<Metadata> {
+  return pageMetadata("/personnalisation", await getText("seo.perso"));
+}
 
 export default async function PersonnalisationPage() {
-  const items = await getProducts();
+  const [hero, showHead, showcase, catHead, cta, items] = await Promise.all([
+    getText("perso.hero"),
+    getText("perso.showcase_head"),
+    getList("perso.showcase"),
+    getText("perso.catalogue_head"),
+    getText("perso.cta"),
+    getProducts(),
+  ]);
+
   return (
     <>
       <Header />
       <main>
-        <SubPageHero
-          image="/images/perso1.webp"
-          eyebrow="Personnalisation"
-          title="Vos articles, à votre marque."
-          text="Sacs, boîtes et gobelets imprimés à votre logo et vos couleurs, pour un emballage qui vous ressemble."
-        />
+        <SubPageHero image={hero.image} eyebrow={hero.eyebrow} title={hero.title} text={hero.text} />
 
         <section className="px-4 sm:px-6 py-16 sm:py-20 lg:px-10 lg:py-24">
           <div className="mx-auto max-w-7xl">
             <StampBadge rotate={-3} variant="ink">
-              En images
+              {showHead.badge}
             </StampBadge>
-            <h2 className="mt-5 font-display text-3xl text-ink sm:text-4xl lg:text-5xl">
-              Trois univers, un seul logo.
-            </h2>
-            <p className="mt-4 max-w-lg font-body text-ink-soft">
-              Boîtes, sacs ou housses : votre marque s&apos;imprime partout où
-              vous en avez besoin.
-            </p>
-
+            <h2 className="mt-5 font-display text-3xl text-ink sm:text-4xl lg:text-5xl">{showHead.title}</h2>
+            <p className="mt-4 max-w-lg font-body text-ink-soft">{showHead.text}</p>
             <div className="mt-10">
-              <ShowcaseGallery images={SHOWCASE} />
+              <ShowcaseGallery
+                images={showcase.map((x) => ({ src: x.image, alt: x.alt, caption: x.caption }))}
+              />
             </div>
           </div>
         </section>
@@ -75,15 +46,12 @@ export default async function PersonnalisationPage() {
         <section className="px-4 sm:px-6 py-16 sm:py-20 lg:px-10 lg:py-24">
           <div className="mx-auto max-w-7xl">
             <StampBadge rotate={-3} variant="ink">
-              Le catalogue
+              {catHead.badge}
             </StampBadge>
             <h2 className="mt-5 break-words font-display text-3xl text-ink sm:text-4xl lg:text-5xl">
-              Quatre supports, une seule marque.
+              {catHead.title}
             </h2>
-            <p className="mt-4 max-w-lg font-body text-ink-soft">
-              Chaque référence se personnalise entièrement : couleurs, logo,
-              finitions. Le reste, c&apos;est nous qui l&apos;imprimons.
-            </p>
+            <p className="mt-4 max-w-lg font-body text-ink-soft">{catHead.text}</p>
 
             <div className="mt-14 grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
               {items.map((it) => (
@@ -102,9 +70,7 @@ export default async function PersonnalisationPage() {
                     <h3 className="font-display text-2xl text-ink">{it.name}</h3>
                     <p className="mt-2 font-body text-sm text-ink-soft">{it.description}</p>
                     {it.price_label && (
-                      <p className="mt-3 font-mono text-xs uppercase tracking-wide text-water">
-                        {it.price_label}
-                      </p>
+                      <p className="mt-3 font-mono text-xs uppercase tracking-wide text-water">{it.price_label}</p>
                     )}
                   </div>
                 </article>
@@ -113,7 +79,7 @@ export default async function PersonnalisationPage() {
           </div>
         </section>
 
-        <SubPageCta text="Prêt à imprimer votre logo ?" />
+        <SubPageCta text={cta.title} />
       </main>
       <Footer />
     </>
