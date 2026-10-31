@@ -1,8 +1,7 @@
 "use client";
 
 import { useState, FormEvent } from "react";
-
-const FORM_ID = process.env.NEXT_PUBLIC_FORMSPREE_CONTACT_ID || "xzepabdv";
+import { submitLead } from "@/lib/leads";
 
 export default function CtaBannerClient({
   badge,
@@ -15,33 +14,26 @@ export default function CtaBannerClient({
   text: string;
   button: string;
 }) {
-  const [status, setStatus] = useState<"idle" | "sending" | "success" | "error">("idle");
+  const [status, setStatus] = useState<"idle" | "sending" | "success" | "error" | "wait">("idle");
 
   async function handleSubmit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
-    if (!FORM_ID) {
-      setStatus("error");
-      return;
-    }
     setStatus("sending");
     const form = e.currentTarget;
     const data = new FormData(form);
-    data.append("source", "CTA rapide — devis");
 
-    try {
-      const res = await fetch(`https://formspree.io/f/${FORM_ID}`, {
-        method: "POST",
-        body: data,
-        headers: { Accept: "application/json" },
-      });
-      if (res.ok) {
-        setStatus("success");
-        form.reset();
-      } else {
-        setStatus("error");
-      }
-    } catch {
-      setStatus("error");
+    const result = await submitLead({
+      email: String(data.get("email") ?? ""),
+      message: "Demande de devis rapide (e-mail seulement)",
+      source: "Bandeau devis",
+      trap: String(data.get("website") ?? ""),
+    });
+
+    if (result === "ok") {
+      setStatus("success");
+      form.reset();
+    } else {
+      setStatus(result);
     }
   }
 
@@ -65,7 +57,7 @@ export default function CtaBannerClient({
         ) : (
           <form
             onSubmit={handleSubmit}
-            className="mx-auto mt-9 flex max-w-xl flex-col gap-3 sm:flex-row"
+            className="relative mx-auto mt-9 flex max-w-xl flex-col gap-3 sm:flex-row"
           >
             <label htmlFor="email" className="sr-only">
               Adresse email
@@ -78,6 +70,11 @@ export default function CtaBannerClient({
               placeholder="votre@email.com"
               className="w-full flex-1 rounded-full border-2 border-ink bg-cream px-5 py-3.5 font-body text-ink placeholder:text-ink/40 focus:outline-none"
             />
+            {/* Champ piège pour les robots : invisible pour les visiteurs */}
+            <div aria-hidden className="absolute -left-[9999px] h-0 w-0 overflow-hidden">
+              <label htmlFor="website-cta">Ne pas remplir</label>
+              <input id="website-cta" name="website" type="text" tabIndex={-1} autoComplete="off" />
+            </div>
             <button
               type="submit"
               disabled={status === "sending"}
@@ -89,10 +86,11 @@ export default function CtaBannerClient({
         )}
 
         {status === "error" && (
+          <p className="mt-3 font-body text-sm text-cream/90">Un problème est survenu, réessayez.</p>
+        )}
+        {status === "wait" && (
           <p className="mt-3 font-body text-sm text-cream/90">
-            {FORM_ID
-              ? "Un problème est survenu, réessayez."
-              : "Formulaire non configuré (ID Formspree manquant)."}
+            Votre demande vient d&apos;être envoyée. Patientez quelques secondes avant d&apos;en envoyer une autre.
           </p>
         )}
       </div>

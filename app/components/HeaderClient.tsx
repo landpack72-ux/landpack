@@ -1,5 +1,7 @@
 "use client";
 
+import Link from "next/link";
+
 import { useEffect, useState } from "react";
 import LandpackLogo from "./LandpackLogo";
 import SearchBar from "./SearchBar";
@@ -7,9 +9,11 @@ import SearchBar from "./SearchBar";
 export default function HeaderClient({
   links,
   ctaLabel,
+  devisHref,
 }: {
   links: { href: string; label: string }[];
   ctaLabel: string;
+  devisHref: string;
 }) {
   const [open, setOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
@@ -30,13 +34,13 @@ export default function HeaderClient({
       }`}
     >
       <div className="mx-auto flex max-w-7xl items-center justify-between gap-3 px-4 sm:px-6 py-3 sm:py-4 lg:px-10">
-        <a href="/" className="flex shrink-0 items-center gap-2 sm:gap-2.5">
+        <Link href="/" className="flex shrink-0 items-center gap-2 sm:gap-2.5">
           <LandpackLogo size={34} />
           <span className="font-display text-xl font-bold inline-block sm:text-2xl">
             <span className="text-nature">Land</span>
             <span className="text-gold">pack</span>
           </span>
-        </a>
+        </Link>
 
         <nav className="hidden items-center gap-8 lg:flex">
           {links.map((l) => (
@@ -57,7 +61,7 @@ export default function HeaderClient({
 
         <div className="hidden lg:block">
           <a
-            href="/#devis"
+            href={devisHref}
             className="whitespace-nowrap rounded-full bg-ink px-5 py-2.5 text-sm font-medium text-cream transition-colors hover:bg-water"
           >
             {ctaLabel}
@@ -94,7 +98,7 @@ export default function HeaderClient({
               </a>
             ))}
             <a
-              href="/#devis"
+              href={devisHref}
               onClick={() => setOpen(false)}
               className="mt-2 rounded-full bg-ink px-5 py-3 text-center text-sm font-medium text-cream"
             >

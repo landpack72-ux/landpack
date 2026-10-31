@@ -64,6 +64,20 @@ export async function getList(id: string): Promise<Record<string, string>[]> {
   return rows.filter((r) => r.is_active).map((r) => ({ ...r.data }));
 }
 
+/** Quelles sections de l'accueil sont affichées (réglage de l'admin). */
+export async function getLayout() {
+  const t = await getText("home.layout");
+  const on = (k: string) => t[k] !== "0";
+  return {
+    offers: on("show_offers"),
+    solutions: t.show_solutions === "1", // masquée par défaut
+    advice: on("show_advice"),
+    contact: on("show_contact"),
+    map: on("show_map"),
+    cta: on("show_cta"),
+  };
+}
+
 export async function getSettings(): Promise<Record<string, string>> {
   try {
     const client = db();

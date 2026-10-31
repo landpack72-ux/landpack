@@ -1,3 +1,4 @@
+import Link from "next/link";
 import StampBadge from "./StampBadge";
 
 type SubPageHeroProps = {
@@ -31,12 +32,12 @@ export default function SubPageHero({
       <div className="absolute inset-0 bg-gradient-to-r from-ink/50 via-ink/10 to-transparent" />
 
       <div className="relative z-10 mx-auto flex h-full max-w-7xl flex-col justify-center px-4 pb-0 sm:px-6 lg:px-10">
-        <a
+        <Link
           href="/"
           className="mb-4 w-fit font-mono text-xs uppercase tracking-wide text-cream/70 hover:text-cream"
         >
           ← Accueil
-        </a>
+        </Link>
         <StampBadge rotate={-3} className="w-fit border-cream/60 !text-cream bg-ink/20">
           {eyebrow}
         </StampBadge>

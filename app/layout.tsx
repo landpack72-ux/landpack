@@ -7,9 +7,33 @@ import "@fontsource/dm-sans/500.css";
 import "@fontsource/dm-sans/700.css";
 import "@fontsource/ibm-plex-mono/400.css";
 import "@fontsource/ibm-plex-mono/500.css";
+import "@fontsource/poppins/latin-400.css";
+import "@fontsource/poppins/latin-500.css";
+import "@fontsource/poppins/latin-600.css";
+import "@fontsource/poppins/latin-700.css";
+import "@fontsource/poppins/latin-800.css";
+import "@fontsource/montserrat/latin-400.css";
+import "@fontsource/montserrat/latin-500.css";
+import "@fontsource/montserrat/latin-600.css";
+import "@fontsource/montserrat/latin-700.css";
+import "@fontsource/montserrat/latin-800.css";
+import "@fontsource/playfair-display/latin-600.css";
+import "@fontsource/playfair-display/latin-700.css";
+import "@fontsource/playfair-display/latin-800.css";
+import "@fontsource/lora/latin-400.css";
+import "@fontsource/lora/latin-500.css";
+import "@fontsource/lora/latin-600.css";
+import "@fontsource/lora/latin-700.css";
+import "@fontsource/inter/latin-400.css";
+import "@fontsource/inter/latin-500.css";
+import "@fontsource/inter/latin-700.css";
+import "@fontsource/nunito/latin-400.css";
+import "@fontsource/nunito/latin-500.css";
+import "@fontsource/nunito/latin-700.css";
 import "./globals.css";
 import WhatsAppButton from "./components/WhatsAppButton";
-import { getList, getProducts, getSettings, getText } from "@/lib/data";
+import { getLayout, getList, getProducts, getSettings, getText } from "@/lib/data";
+import { themeCss } from "@/lib/theme";
 
 const SITE_URL = "https://landpack.ma";
 
@@ -58,7 +82,7 @@ export default async function RootLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
-  const [s, seo, products, solutions, machines, conso, smart] = await Promise.all([
+  const [s, seo, products, solutions, machines, conso, smart, theme, layout] = await Promise.all([
     getSettings(),
     getText("seo.home"),
     getProducts(),
@@ -66,13 +90,17 @@ export default async function RootLayout({
     getList("ma.machines"),
     getList("ma.conso"),
     getList("ma.smart"),
+    getText("style.theme"),
+    getLayout(),
   ]);
+  const css = themeCss(theme);
 
   // Le catalogue envoyé à Google est construit à partir du contenu de l'admin :
   // quand le client modifie un produit ou une solution, les données structurées suivent.
   const makesOffer: Offer[] = [
     ...products.map((p) => offer("Product", p.name, p.description ?? "")),
-    ...solutions.map((x) => offer("Service", x.title, x.text ?? "")),
+    // La liste « Nos solutions » n'est envoyée à Google que si la section est affichée sur le site.
+    ...(layout.solutions ? solutions.map((x) => offer("Service", x.title, x.text ?? "")) : []),
     ...machines.map((x) => offer("Product", x.title, x.text ?? "")),
     offer("Product", "Consommables pour machines d'emballage", conso.map((x) => x.title).join(", ")),
     ...smart.map((x) => offer("Service", x.title, x.text ?? "")),
@@ -123,11 +151,11 @@ export default async function RootLayout({
   return (
     <html lang="fr">
       <body className="antialiased">
+        {css && <style dangerouslySetInnerHTML={{ __html: css }} />}
         {children}
         <WhatsAppButton />
         <script
           type="application/ld+json"
-          // eslint-disable-next-line react/no-danger
           dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
         />
       </body>

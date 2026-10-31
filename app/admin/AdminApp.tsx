@@ -34,7 +34,8 @@ const btnGhost =
 export default function AdminApp() {
   const [state, setState] = useState<"loading" | "out" | "denied" | "in">("loading");
   const [email, setEmail] = useState("");
-  const [tab, setTab] = useState<"pages" | "products" | "settings">("pages");
+  const [tab, setTab] = useState<"leads" | "pages" | "products" | "settings">("leads");
+  const [newCount, setNewCount] = useState(0);
   const [toast, setToast] = useState<{ msg: string; ok: boolean } | null>(null);
 
   const notify = useCallback((msg: string, ok = true) => {
@@ -73,6 +74,15 @@ export default function AdminApp() {
     return () => sub.subscription.unsubscribe();
   }, [check]);
 
+  useEffect(() => {
+    if (state !== "in") return;
+    getBrowserClient()
+      .from("leads")
+      .select("id", { count: "exact", head: true })
+      .eq("is_handled", false)
+      .then(({ count }) => setNewCount(count ?? 0));
+  }, [state]);
+
   const ctx = useMemo<Ctx>(() => ({ notify, publish }), [notify, publish]);
 
   if (!configured) {
@@ -102,6 +112,7 @@ export default function AdminApp() {
   }
 
   const tabs = [
+    ["leads", newCount > 0 ? `Demandes (${newCount})` : "Demandes"],
     ["pages", "Pages & textes"],
     ["products", "Catalogue & prix"],
     ["settings", "Coordonnées"],
@@ -139,6 +150,7 @@ export default function AdminApp() {
       </nav>
 
       <main className="mt-6">
+        {tab === "leads" && <LeadsTab ctx={ctx} onCount={setNewCount} />}
         {tab === "pages" && <PagesTab ctx={ctx} />}
         {tab === "products" && <ProductsTab ctx={ctx} />}
         {tab === "settings" && <SettingsTab ctx={ctx} />}
@@ -244,17 +256,157 @@ function ImageField({ value, onChange, ctx }: { value: string; onChange: (v: str
 }
 
 function FieldInput({ field, value, onChange, ctx }: { field: Field; value: string; onChange: (v: string) => void; ctx: Ctx }) {
+  if (field.kind === "toggle") {
+    return (
+      <label className="flex items-center gap-3 rounded-lg bg-white px-3 py-2 text-sm">
+        <input type="checkbox" className="h-4 w-4" checked={value === "1"} onChange={(e) => onChange(e.target.checked ? "1" : "0")} />
+        {field.label}
+      </label>
+    );
+  }
   return (
     <label className="block">
       <span className="mb-1 block text-xs font-medium text-ink-soft">{field.label}</span>
       {field.kind === "image" ? (
         <ImageField value={value} onChange={onChange} ctx={ctx} />
+      ) : field.kind === "color" ? (
+        <div className="flex items-center gap-3">
+          <input
+            type="color"
+            value={/^#[0-9a-fA-F]{6}$/.test(value) ? value : "#000000"}
+            onChange={(e) => onChange(e.target.value)}
+            className="h-10 w-16 cursor-pointer rounded border border-ink/15 bg-white p-1"
+          />
+          <span className="font-mono text-xs text-ink-soft">{value}</span>
+        </div>
+      ) : field.kind === "select" ? (
+        <select className={input} value={value} onChange={(e) => onChange(e.target.value)}>
+          {field.options?.map((o) => (
+            <option key={o.value} value={o.value}>{o.label}</option>
+          ))}
+        </select>
+      ) : field.kind === "range" ? (
+        <div className="flex items-center gap-3">
+          <input
+            type="range"
+            className="w-full"
+            min={field.min}
+            max={field.max}
+            step={field.step}
+            value={value || "1"}
+            onChange={(e) => onChange(e.target.value)}
+          />
+          <span className="w-14 text-right text-sm">{Math.round(Number(value || 1) * 100)} %</span>
+        </div>
       ) : field.kind === "textarea" ? (
         <textarea className={input} rows={3} value={value} onChange={(e) => onChange(e.target.value)} />
       ) : (
         <input className={input} value={value} onChange={(e) => onChange(e.target.value)} />
       )}
     </label>
+  );
+}
+
+/* ------------------------------------------------------------------ */
+/* Onglet : demandes reçues (formulaire de contact + bandeau devis)    */
+/* ------------------------------------------------------------------ */
+type Lead = {
+  id: string;
+  name: string | null;
+  email: string | null;
+  phone: string | null;
+  message: string | null;
+  source: string;
+  is_handled: boolean;
+  created_at: string;
+};
+
+function LeadsTab({ ctx, onCount }: { ctx: Ctx; onCount: (n: number) => void }) {
+  const [leads, setLeads] = useState<Lead[] | null>(null);
+  const [filter, setFilter] = useState<"new" | "all">("new");
+  const [problem, setProblem] = useState("");
+
+  const load = useCallback(async () => {
+    const { data, error } = await getBrowserClient()
+      .from("leads")
+      .select("id,name,email,phone,message,source,is_handled,created_at")
+      .order("created_at", { ascending: false })
+      .limit(200);
+    setProblem(
+      error
+        ? `Impossible de lire les demandes (${error.message}). Avez-vous exécuté le fichier landpack-leads.sql dans Supabase ?`
+        : "",
+    );
+    const rows = (data ?? []) as Lead[];
+    setLeads(rows);
+    onCount(rows.filter((l) => !l.is_handled).length);
+  }, [onCount]);
+
+  useEffect(() => {
+    // Chargement initial des demandes à l'ouverture de l'onglet.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    load();
+  }, [load]);
+
+  async function toggle(l: Lead) {
+    const { error } = await getBrowserClient().from("leads").update({ is_handled: !l.is_handled }).eq("id", l.id);
+    if (error) ctx.notify("Erreur : " + error.message, false);
+    await load();
+  }
+
+  async function remove(l: Lead) {
+    if (!confirm("Supprimer cette demande définitivement ?")) return;
+    const { error } = await getBrowserClient().from("leads").delete().eq("id", l.id);
+    if (error) ctx.notify("Erreur : " + error.message, false);
+    await load();
+  }
+
+  if (!leads) return <p className="text-sm">Chargement…</p>;
+
+  const shown = leads.filter((l) => filter === "all" || !l.is_handled);
+  const fresh = leads.filter((l) => !l.is_handled).length;
+
+  return (
+    <div className="space-y-4">
+      {problem && <p className="rounded-lg bg-red-50 p-3 text-sm text-red-700">{problem}</p>}
+      <div className="flex flex-wrap items-center gap-3">
+        <select className={`${input} w-auto`} value={filter} onChange={(e) => setFilter(e.target.value as "new" | "all")}>
+          <option value="new">Nouvelles demandes ({fresh})</option>
+          <option value="all">Toutes les demandes ({leads.length})</option>
+        </select>
+        <button className={btnGhost} onClick={load}>Actualiser</button>
+      </div>
+      <p className="text-sm text-ink-soft">
+        Les demandes envoyées depuis le site apparaissent ici. Pensez à venir les consulter régulièrement.
+      </p>
+
+      {shown.length === 0 && !problem && (
+        <p className="rounded-2xl border border-ink/10 bg-paper p-6 text-center text-sm text-ink-soft">
+          {filter === "new" ? "Aucune nouvelle demande." : "Aucune demande pour le moment."}
+        </p>
+      )}
+
+      {shown.map((l) => (
+        <div key={l.id} className={`space-y-2 rounded-2xl border p-4 ${l.is_handled ? "border-ink/10 bg-paper" : "border-water bg-white"}`}>
+          <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-ink-soft">
+            <span>
+              {new Date(l.created_at).toLocaleString("fr-FR", { dateStyle: "medium", timeStyle: "short" })} · {l.source}
+            </span>
+            {!l.is_handled && <span className="rounded-full bg-water px-2 py-0.5 text-cream">Nouvelle</span>}
+          </div>
+          <p className="font-medium">{l.name || "Sans nom"}</p>
+          <div className="flex flex-wrap gap-x-5 gap-y-1 text-sm">
+            {l.email && <a className="text-water underline" href={`mailto:${l.email}`}>{l.email}</a>}
+            {l.phone && <a className="text-water underline" href={`tel:${l.phone.replace(/\s/g, "")}`}>{l.phone}</a>}
+          </div>
+          {l.message && <p className="whitespace-pre-wrap rounded-lg bg-cream p-3 text-sm">{l.message}</p>}
+          <div className="flex gap-2 pt-1">
+            <button className={btn} onClick={() => toggle(l)}>{l.is_handled ? "Remettre en nouvelle" : "Marquer comme traitée"}</button>
+            <button className={btnGhost} onClick={() => remove(l)}>Supprimer</button>
+          </div>
+        </div>
+      ))}
+    </div>
   );
 }
 
@@ -280,6 +432,8 @@ function PagesTab({ ctx }: { ctx: Ctx }) {
   }, []);
 
   useEffect(() => {
+    // Chargement initial des contenus à l'ouverture de l'onglet.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     load();
   }, [load]);
 
@@ -296,7 +450,7 @@ function PagesTab({ ctx }: { ctx: Ctx }) {
         ))}
       </select>
       <p className="text-sm text-ink-soft">
-        Chaque bloc correspond à une zone du site. Ouvrez un bloc, modifiez, puis cliquez sur « Enregistrer » : le site est mis à jour aussitôt.
+        Chaque bloc correspond à une zone du site (et le style est dans « Style du site »). Ouvrez un bloc, modifiez, puis cliquez sur « Enregistrer » : le site est mis à jour aussitôt.
         Les produits et leurs prix se modifient dans l&apos;onglet « Catalogue & prix », le téléphone et l&apos;adresse dans « Coordonnées ».
       </p>
       {defs.map((def) => {
@@ -323,12 +477,13 @@ function SingleEditor({ def, row, reload, ctx }: { def: SectionDef; row?: Sectio
   const [vals, setVals] = useState<Record<string, string>>({ ...(def.defaults[0] ?? {}), ...(row?.data ?? {}) });
   const [busy, setBusy] = useState(false);
 
-  async function save() {
+  async function save(next?: Record<string, string>) {
+    const data = next ?? vals;
     setBusy(true);
     const db = getBrowserClient();
     const { error } = row
-      ? await db.from("site_sections").update({ data: vals }).eq("id", row.id)
-      : await db.from("site_sections").insert({ section: def.id, data: vals, sort_order: 0 });
+      ? await db.from("site_sections").update({ data }).eq("id", row.id)
+      : await db.from("site_sections").insert({ section: def.id, data, sort_order: 0 });
     if (error) ctx.notify("Erreur : " + error.message, false);
     else {
       await ctx.publish();
@@ -338,12 +493,24 @@ function SingleEditor({ def, row, reload, ctx }: { def: SectionDef; row?: Sectio
     setBusy(false);
   }
 
+  function resetToDefaults() {
+    if (!confirm("Rétablir les valeurs d'origine ?")) return;
+    const d = def.defaults[0] ?? {};
+    setVals(d);
+    save(d);
+  }
+
   return (
     <>
       {def.fields.map((f) => (
         <FieldInput key={f.key} field={f} value={vals[f.key] ?? ""} onChange={(v) => setVals({ ...vals, [f.key]: v })} ctx={ctx} />
       ))}
-      <button className={btn} onClick={save} disabled={busy}>{busy ? "Enregistrement…" : "Enregistrer"}</button>
+      <div className="flex flex-wrap gap-2">
+        <button className={btn} onClick={() => save()} disabled={busy}>{busy ? "Enregistrement…" : "Enregistrer"}</button>
+        {def.resettable && (
+          <button className={btnGhost} onClick={resetToDefaults} disabled={busy}>Rétablir les valeurs d&apos;origine</button>
+        )}
+      </div>
     </>
   );
 }
@@ -445,13 +612,16 @@ function ProductsTab({ ctx }: { ctx: Ctx }) {
   const load = useCallback(async () => {
     const db = getBrowserClient();
     const cols = "id,name,description,image_url,price_label,is_active,sort_order";
-    let { data, error } = await db.from("products").select(cols).order("sort_order").order("created_at");
+    const first = await db.from("products").select(cols).order("sort_order").order("created_at");
+    const error = first.error;
+    let data = first.data;
     if (error) ctx.notify("Erreur : " + error.message, false);
     // Première ouverture : on copie le catalogue actuel du site dans la base.
     if (!error && !data?.length && !seeded.current) {
       seeded.current = true;
       await db.from("products").insert(DEFAULT_PRODUCTS);
-      ({ data } = await db.from("products").select(cols).order("sort_order").order("created_at"));
+      const again = await db.from("products").select(cols).order("sort_order").order("created_at");
+      data = again.data;
     }
     setItems((data as Row<Product>[]) ?? []);
   }, [ctx]);

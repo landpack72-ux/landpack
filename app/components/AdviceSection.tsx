@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { getList, getText } from "@/lib/data";
 import StampBadge from "./StampBadge";
 
@@ -38,13 +39,13 @@ export default async function AdviceSection() {
             <p className="mt-3 font-body text-sm text-cream/80">
               {t.card_text}
             </p>
-            <a
+            <Link
               href="/#contact"
               className="mt-6 inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-full bg-gold px-5 py-3 text-sm font-medium text-ink transition-transform hover:-translate-y-0.5"
             >
               {t.card_cta}
               <span aria-hidden>→</span>
-            </a>
+            </Link>
           </div>
         </div>
       </div>
