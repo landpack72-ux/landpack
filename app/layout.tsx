@@ -5,8 +5,6 @@ import "@fontsource/sora/800.css";
 import "@fontsource/dm-sans/400.css";
 import "@fontsource/dm-sans/500.css";
 import "@fontsource/dm-sans/700.css";
-import "@fontsource/ibm-plex-mono/400.css";
-import "@fontsource/ibm-plex-mono/500.css";
 import "@fontsource/poppins/latin-400.css";
 import "@fontsource/poppins/latin-500.css";
 import "@fontsource/poppins/latin-600.css";
@@ -32,14 +30,17 @@ import "@fontsource/nunito/latin-500.css";
 import "@fontsource/nunito/latin-700.css";
 import "./globals.css";
 import WhatsAppButton from "./components/WhatsAppButton";
-import { getLayout, getList, getProducts, getSettings, getText } from "@/lib/data";
+import { getCatalogue, getList, getSettings, getText } from "@/lib/data";
 import { themeCss } from "@/lib/theme";
 
 const SITE_URL = "https://landpack.ma";
 
+const absolute = (path: string) => (/^https?:\/\//.test(path) ? path : `${SITE_URL}${path.startsWith("/") ? "" : "/"}${path}`);
+
 // Titre, description et mots-clés de l'accueil : modifiables dans l'admin.
 export async function generateMetadata(): Promise<Metadata> {
-  const seo = await getText("seo.home");
+  const [seo, slides, s] = await Promise.all([getText("seo.home"), getList("home.slides"), getSettings()]);
+  const shareImage = slides[0]?.image || s.logo_url;
   return {
     metadataBase: new URL(SITE_URL),
     title: { default: seo.title, template: "%s | Landpack" },
@@ -58,53 +59,40 @@ export async function generateMetadata(): Promise<Metadata> {
       siteName: "Landpack",
       title: seo.title,
       description: seo.description,
-      images: [
-        { url: "/images/tout.webp", width: 1500, height: 1049, alt: "Emballages alimentaires personnalisés Landpack au Maroc" },
-      ],
+      images: [{ url: shareImage, alt: "Emballages alimentaires personnalisés Landpack" }],
     },
     twitter: {
       card: "summary_large_image",
       title: seo.title,
       description: seo.description,
-      images: ["/images/tout.webp"],
+      images: [shareImage],
     },
   };
 }
-
-type Offer = { "@type": "Offer"; itemOffered: { "@type": string; name: string; description: string } };
-const offer = (type: "Product" | "Service", name: string, description: string): Offer => ({
-  "@type": "Offer",
-  itemOffered: { "@type": type, name, description },
-});
 
 export default async function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
-  const [s, seo, products, solutions, machines, conso, smart, theme, layout] = await Promise.all([
+  const [s, seo, categories, theme] = await Promise.all([
     getSettings(),
     getText("seo.home"),
-    getProducts(),
-    getList("home.solutions"),
-    getList("ma.machines"),
-    getList("ma.conso"),
-    getList("ma.smart"),
+    getCatalogue(),
     getText("style.theme"),
-    getLayout(),
   ]);
   const css = themeCss(theme);
 
   // Le catalogue envoyé à Google est construit à partir du contenu de l'admin :
-  // quand le client modifie un produit ou une solution, les données structurées suivent.
-  const makesOffer: Offer[] = [
-    ...products.map((p) => offer("Product", p.name, p.description ?? "")),
-    // La liste « Nos solutions » n'est envoyée à Google que si la section est affichée sur le site.
-    ...(layout.solutions ? solutions.map((x) => offer("Service", x.title, x.text ?? "")) : []),
-    ...machines.map((x) => offer("Product", x.title, x.text ?? "")),
-    offer("Product", "Consommables pour machines d'emballage", conso.map((x) => x.title).join(", ")),
-    ...smart.map((x) => offer("Service", x.title, x.text ?? "")),
-  ];
+  // quand le client modifie une catégorie ou un modèle, les données structurées suivent.
+  const makesOffer = categories.map((c) => ({
+    "@type": "Offer",
+    itemOffered: {
+      "@type": "Product",
+      name: `Personnalisation : ${c.name}`,
+      description: `${c.description ?? c.name} Modèles : ${c.items.map((p) => p.dimensions).filter(Boolean).join(" ; ")}.`,
+    },
+  }));
 
   const jsonLd = {
     "@context": "https://schema.org",
@@ -114,10 +102,10 @@ export default async function RootLayout({
     alternateName: "Landpack Maroc",
     description: seo.description,
     url: SITE_URL,
-    logo: `${SITE_URL}/images/logo.webp`,
-    image: `${SITE_URL}/images/tout.webp`,
+    logo: absolute(s.logo_url),
+    image: absolute(s.logo_url),
     telephone: s.phone,
-    email: s.email,
+    ...(s.email ? { email: s.email } : {}),
     founder: { "@type": "Person", name: "Fayesall" },
     priceRange: "$$",
     currenciesAccepted: "MAD",
@@ -156,7 +144,8 @@ export default async function RootLayout({
         <WhatsAppButton />
         <script
           type="application/ld+json"
-          dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
+          // "<" est échappé : aucun contenu saisi dans l'admin ne peut refermer la balise <script>.
+          dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd).replace(/</g, "\\u003c") }}
         />
       </body>
     </html>

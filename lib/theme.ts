@@ -10,13 +10,12 @@ const DEFAULT = DEF_BY_ID["style.theme"].defaults[0];
 const COLOR_VARS: Record<string, string> = {
   color_water: "--water",
   color_water_dark: "--water-dark",
+  color_kraft: "--kraft",
+  color_kraft_dark: "--kraft-dark",
   color_ink: "--ink",
   color_ink_soft: "--ink-soft",
   color_cream: "--kraft-cream",
   color_paper: "--kraft-paper",
-  color_gold: "--gold-thread",
-  color_stamp: "--stamp",
-  color_nature: "--nature",
 };
 
 const STACKS: Record<string, string> = {

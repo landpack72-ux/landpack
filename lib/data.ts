@@ -5,20 +5,20 @@
 import { cache } from "react";
 import { createClient } from "@supabase/supabase-js";
 import { DEF_BY_ID } from "./content";
-import { DEFAULT_PRODUCTS, DEFAULT_SETTINGS, type Product } from "./defaults";
+import { DEFAULT_CATEGORIES, DEFAULT_SETTINGS, defaultProducts, type Product } from "./defaults";
 
 const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const anon = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 
-// Les réponses sont gardées en cache 5 minutes, ou jusqu'à ce que l'admin
-// enregistre un changement (voir app/api/revalidate/route.ts).
+// Les réponses sont gardées en cache 1 minute au plus, ou jusqu'à ce que l'admin
+// enregistre un changement (voir app/api/admin/db/route.ts).
 function db() {
   if (!url || !anon) return null;
   return createClient(url, anon, {
     auth: { persistSession: false, autoRefreshToken: false },
     global: {
       fetch: (input, init) =>
-        fetch(input, { ...init, next: { revalidate: 300, tags: ["landpack"] } }),
+        fetch(input, { ...init, next: { revalidate: 60, tags: ["landpack"] } }),
     },
   });
 }
@@ -64,20 +64,6 @@ export async function getList(id: string): Promise<Record<string, string>[]> {
   return rows.filter((r) => r.is_active).map((r) => ({ ...r.data }));
 }
 
-/** Quelles sections de l'accueil sont affichées (réglage de l'admin). */
-export async function getLayout() {
-  const t = await getText("home.layout");
-  const on = (k: string) => t[k] !== "0";
-  return {
-    offers: on("show_offers"),
-    solutions: t.show_solutions === "1", // masquée par défaut
-    advice: on("show_advice"),
-    contact: on("show_contact"),
-    map: on("show_map"),
-    cta: on("show_cta"),
-  };
-}
-
 export async function getSettings(): Promise<Record<string, string>> {
   try {
     const client = db();
@@ -85,25 +71,75 @@ export async function getSettings(): Promise<Record<string, string>> {
     const { data, error } = await client.from("site_settings").select("key,value");
     if (error || !data?.length) return DEFAULT_SETTINGS;
     const out = { ...DEFAULT_SETTINGS };
-    for (const row of data) if (row.value) out[row.key] = row.value;
+    // Une valeur vide enregistrée en base est respectée (ex. e-mail public volontairement masqué).
+    for (const row of data) out[row.key] = row.value ?? "";
+    if (!out.logo_url) out.logo_url = DEFAULT_SETTINGS.logo_url;
     return out;
   } catch {
     return DEFAULT_SETTINGS;
   }
 }
 
-export async function getProducts(): Promise<Product[]> {
+export type CatalogueCategory = {
+  id: string;
+  slug: string;
+  name: string;
+  description: string | null;
+  image_url: string | null;
+  items: Product[];
+};
+
+const fallbackCatalogue = (): CatalogueCategory[] =>
+  DEFAULT_CATEGORIES.map((c) => ({
+    id: c.slug,
+    slug: c.slug,
+    name: c.name,
+    description: c.description,
+    image_url: c.image_url,
+    items: defaultProducts().filter((p) => p.category_slug === c.slug),
+  }));
+
+export async function getCategory(slug: string): Promise<CatalogueCategory | null> {
+  return (await getCatalogue()).find((c) => c.slug === slug) ?? null;
+}
+
+/** Un modèle (avec sa catégorie) à partir de son identifiant. */
+export async function getProduct(id: string): Promise<{ product: Product & { id: string }; category: CatalogueCategory } | null> {
+  for (const c of await getCatalogue()) {
+    const p = c.items.find((x) => x.id === id);
+    if (p) return { product: p as Product & { id: string }, category: c };
+  }
+  return null;
+}
+
+/** Catégories visibles, chacune avec ses modèles visibles (dans l'ordre choisi dans l'admin). */
+export const getCatalogue = cache(async (): Promise<CatalogueCategory[]> => {
   try {
     const client = db();
-    if (!client) return DEFAULT_PRODUCTS;
-    const { data, error } = await client
-      .from("products")
-      .select("id,name,description,image_url,price_label,is_active,sort_order")
-      .order("sort_order")
-      .order("created_at");
-    if (error || !data?.length) return DEFAULT_PRODUCTS;
-    return (data as Product[]).filter((p) => p.is_active);
+    if (!client) return fallbackCatalogue();
+    const [cats, prods] = await Promise.all([
+      client.from("categories").select("id,slug,name,description,image_url,is_active,sort_order").order("sort_order"),
+      client
+        .from("products")
+        .select("id,category_id,name,dimensions,description,image_url,unit_price,price_label,min_qty,custom_price_label,custom_min_qty,is_active,sort_order")
+        .order("sort_order")
+        .order("created_at"),
+    ]);
+    if (cats.error || prods.error || !cats.data?.length) return fallbackCatalogue();
+
+    const products = ((prods.data ?? []) as Product[]).map((p) => ({ ...p, unit_price: p.unit_price == null ? null : Number(p.unit_price) }));
+    return cats.data
+      .filter((c) => c.is_active)
+      .map((c) => ({
+        id: c.id,
+        slug: c.slug,
+        name: c.name,
+        description: c.description,
+        image_url: c.image_url,
+        items: products.filter((p) => p.category_id === c.id && p.is_active),
+      }))
+      .filter((c) => c.items.length > 0);
   } catch {
-    return DEFAULT_PRODUCTS;
+    return fallbackCatalogue();
   }
-}
+});

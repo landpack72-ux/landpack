@@ -1,78 +1,79 @@
-import { getProducts, getSettings, getText } from "@/lib/data";
+import Link from "next/link";
+import { getCatalogue, getSettings, getText } from "@/lib/data";
 import { formatPhone, telHref, waHref } from "@/lib/format";
-import LandpackLogo from "./LandpackLogo";
-
-const YEAR = new Date().getFullYear();
+import Logo from "./Logo";
+import { PhoneIcon, PinIcon, WhatsAppIcon } from "./icons";
 
 export default async function Footer() {
-  const [s, t, products] = await Promise.all([getSettings(), getText("global.footer"), getProducts()]);
+  const [s, t, categories] = await Promise.all([getSettings(), getText("global.footer"), getCatalogue()]);
+
+  const title = "font-body text-sm font-bold uppercase tracking-[0.12em] text-ink";
+  const link = "inline-block py-1.5 font-body text-[15px] text-ink hover:text-water hover:underline";
+  const contact = "flex items-start gap-3 py-1.5 font-body text-[15px] text-ink";
+
   return (
-    <footer className="bg-water-dark px-4 sm:px-6 pb-8 pt-14 sm:pt-16 text-cream lg:px-10">
-      <div className="mx-auto max-w-7xl">
-        <div className="grid gap-10 sm:grid-cols-2 lg:grid-cols-4">
-          <div>
-            <div className="flex items-center gap-2.5">
-              <LandpackLogo size={34} />
-              <span className="font-display text-2xl inline-block">
-                <span className="text-nature-light">Land</span>
-                <span className="text-gold">pack</span>
-              </span>
-            </div>
-            <p className="mt-4 max-w-xs font-body text-sm text-cream/70">
-              {t.tagline}
-            </p>
-          </div>
-
-          <div>
-            <p className="font-mono text-xs uppercase tracking-wide text-cream/50">
-              {t.products_title}
-            </p>
-            <ul className="mt-4 space-y-2 font-body text-sm text-cream/80">
-              {products.map((p) => (
-                <li key={p.id ?? p.name}><a href="/personnalisation" className="hover:text-gold">{p.name}</a></li>
-              ))}
-            </ul>
-          </div>
-
-          <div>
-            <p className="font-mono text-xs uppercase tracking-wide text-cream/50">
-              {t.workshop_title}
-            </p>
-            <ul className="mt-4 space-y-2 font-body text-sm text-cream/80">
-              <li>{s.address}</li>
-              <li>
-                <a href={`mailto:${s.email}`} className="hover:text-gold">
-                  {s.email}
-                </a>
-              </li>
-              <li>
-                <a href={telHref(s.phone)} className="hover:text-gold">
-                  {formatPhone(s.phone)}
-                </a>
-              </li>
-            </ul>
-          </div>
-
-          <div>
-            <p className="font-mono text-xs uppercase tracking-wide text-cream/50">
-              {t.social_title}
-            </p>
-            <ul className="mt-4 space-y-2 font-body text-sm text-cream/80">
-              {t.instagram_url && (
-                <li><a href={t.instagram_url} target="_blank" rel="noopener noreferrer" className="hover:text-gold">Instagram</a></li>
-              )}
-              {t.facebook_url && (
-                <li><a href={t.facebook_url} target="_blank" rel="noopener noreferrer" className="hover:text-gold">Facebook</a></li>
-              )}
-              <li><a href={waHref(s.whatsapp)} target="_blank" rel="noopener noreferrer" className="hover:text-gold">WhatsApp</a></li>
-            </ul>
-          </div>
+    <footer className="mt-10 border-t-4 border-kraft bg-[#f0efeb] text-ink sm:mt-14">
+      <div className="mx-auto grid max-w-7xl gap-10 px-4 py-10 sm:px-6 sm:py-12 md:grid-cols-3 lg:px-10">
+        <div>
+          <Logo src={s.logo_url} className="h-24 w-auto" />
+          <p className="mt-4 max-w-xs font-body text-[15px] leading-relaxed text-ink-soft">{t.tagline}</p>
         </div>
 
-        <div className="mt-14 flex flex-col items-start justify-between gap-4 border-t-2 border-dashed border-cream/20 pt-6 font-mono text-xs text-cream/50 sm:flex-row sm:items-center">
-          <p>© {YEAR} Landpack. Tous droits réservés.</p>
-          <p>{t.note}</p>
+        <div>
+          <p className={title}>{t.products_title}</p>
+          <span className="mt-2 block h-0.5 w-10 bg-kraft" />
+          <ul className="mt-3">
+            {categories.map((c) => (
+              <li key={c.id}>
+                <Link href={`/categorie/${c.slug}`} className={link}>
+                  {c.name}
+                </Link>
+              </li>
+            ))}
+            <li>
+              <Link href="/devis" className={link}>Demander un devis</Link>
+            </li>
+            <li>
+              <Link href="/compte" className={link}>Mon compte</Link>
+            </li>
+          </ul>
         </div>
+
+        <div>
+          <p className={title}>{t.contact_title}</p>
+          <span className="mt-2 block h-0.5 w-10 bg-kraft" />
+          <ul className="mt-3">
+            <li className={contact}>
+              <PinIcon className="mt-0.5 h-5 w-5 shrink-0 text-water" />
+              <span>{s.address}</span>
+            </li>
+            <li>
+              <a href={telHref(s.phone)} className={`${contact} hover:text-water`}>
+                <PhoneIcon className="mt-0.5 h-5 w-5 shrink-0 text-water" />
+                <span className="font-semibold">{formatPhone(s.phone)}</span>
+              </a>
+            </li>
+            <li>
+              <a href={waHref(s.whatsapp)} target="_blank" rel="noopener noreferrer" className={`${contact} hover:text-water`}>
+                <WhatsAppIcon className="mt-0.5 h-5 w-5 shrink-0 text-[#25D366]" />
+                <span className="font-semibold">WhatsApp</span>
+              </a>
+            </li>
+            {s.email && (
+              <li>
+                <a href={`mailto:${s.email}`} className={`${contact} hover:text-water`}>
+                  <span>{s.email}</span>
+                </a>
+              </li>
+            )}
+          </ul>
+        </div>
+      </div>
+
+      <div className="border-t border-ink/15">
+        <p className="mx-auto max-w-7xl px-4 pb-20 pt-5 font-body text-sm text-ink-soft sm:px-6 sm:pb-5 lg:px-10">
+          © {new Date().getFullYear()} Landpack. {t.note}
+        </p>
       </div>
     </footer>
   );

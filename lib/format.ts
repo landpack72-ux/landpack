@@ -12,3 +12,10 @@ export function telHref(phone: string): string {
 export function waHref(whatsapp: string): string {
   return `https://wa.me/${whatsapp.replace(/\D/g, "")}`;
 }
+
+const SITE_URL = "https://landpack.ma";
+
+/** Adresse complète d'un chemin ou d'une image du site (pour Google et les réseaux sociaux). */
+export function absoluteUrl(path: string): string {
+  return /^https?:\/\//.test(path) ? path : `${SITE_URL}${path.startsWith("/") ? "" : "/"}${path}`;
+}
