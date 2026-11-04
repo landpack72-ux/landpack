@@ -1,6 +1,6 @@
 import { json, sameOrigin } from "@/lib/admin-server";
 import { requireCustomer } from "@/lib/customer-server";
-import { clean } from "@/lib/lead-clean";
+import { clean, cleanPhone } from "@/lib/lead-clean";
 
 // Met à jour le prénom, le nom et l'adresse du client connecté (le numéro, lui, ne change pas).
 export async function POST(req: Request) {
@@ -20,7 +20,7 @@ export async function POST(req: Request) {
       Authorization: `Bearer ${c.token}`,
       "Content-Type": "application/json",
     },
-    body: JSON.stringify({ data: { first_name: first, last_name: last, address: clean(b?.address, 300) ?? "" } }),
+    body: JSON.stringify({ data: { first_name: first, last_name: last, phone: cleanPhone(b?.phone) ?? "", address: clean(b?.address, 300) ?? "" } }),
   }).catch(() => null);
 
   if (!res || !res.ok) return json({ error: "L'enregistrement a échoué. Réessayez." }, 400);

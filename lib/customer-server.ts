@@ -7,6 +7,7 @@ import { cookies } from "next/headers";
 import type { SupabaseClient, User } from "@supabase/supabase-js";
 import { supabaseFor } from "./admin-server";
 import { makeLimiter } from "./rate-limit";
+export { passwordProblem } from "./password-rules";
 
 const ACCESS = "lp_ct";
 const REFRESH = "lp_cr";
@@ -70,22 +71,58 @@ export async function requireCustomer(): Promise<CustomerCtx | null> {
   return { db, user, token: access };
 }
 
-/** « 06 12 34 56 78 », « +212 6 12 34 56 78 » ou « 00212612345678 » donnent le même identifiant. */
-export function phoneDigits(raw: string): string {
-  let d = raw.replace(/\D/g, "");
-  if (d.startsWith("00")) d = d.slice(2);
-  if (d.length === 10 && d.startsWith("0")) d = "212" + d.slice(1);
-  return d;
+// ------------------------------- identité : e-mail + mot de passe -------------------------------
+
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
+
+/** Adresse e-mail propre (minuscules, sans espaces) ou null si elle n'a pas l'air valable. */
+export function cleanEmail(v: unknown): string | null {
+  if (typeof v !== "string") return null;
+  const e = v.trim().toLowerCase();
+  return e.length <= 254 && EMAIL_RE.test(e) ? e : null;
 }
-export const validDigits = (d: string) => /^\d{9,15}$/.test(d);
-export const emailFor = (digits: string) => `c${digits}@comptes.landpack.ma`;
 
 const str = (v: unknown) => (typeof v === "string" ? v : "");
 export function profileOf(user: User) {
   const m = (user.user_metadata ?? {}) as Record<string, unknown>;
-  return { first_name: str(m.first_name), last_name: str(m.last_name), phone: str(m.phone), address: str(m.address) };
+  return { first_name: str(m.first_name), last_name: str(m.last_name), phone: str(m.phone), address: str(m.address), email: user.email ?? "" };
 }
 
-export const loginLimiter = makeLimiter(10, 15 * 60 * 1000);
-export const registerLimiter = makeLimiter(5, 60 * 60 * 1000);
+/** Adresse du site d'où vient la demande (pour les liens des e-mails de confirmation et de réinitialisation). */
+export function originOf(req: Request): string | null {
+  const o = req.headers.get("origin");
+  try {
+    return o ? new URL(o).origin : null;
+  } catch {
+    return null;
+  }
+}
+
+/** Traduit une erreur de Supabase Auth en message clair pour le client, avec le code HTTP adapté. */
+export function authFailure(error: { code?: string; message: string; status?: number }): { status: number; message: string; code: string } {
+  const code = error.code ?? "";
+  const m = error.message.toLowerCase();
+  if (code === "user_already_exists" || code === "email_exists" || m.includes("already registered") || m.includes("already been registered"))
+    return { status: 409, code: "user_already_exists", message: "Un compte existe déjà avec cet e-mail. Connectez-vous, ou utilisez « Mot de passe oublié »." };
+  if (code === "signup_disabled" || m.includes("signups not allowed") || m.includes("signup is disabled") || m.includes("signups are disabled"))
+    return { status: 403, code: "signup_disabled", message: "La création de compte est momentanément indisponible. Contactez-nous." };
+  if (code === "weak_password" || m.includes("password should") || m.includes("weak password"))
+    return { status: 400, code: "weak_password", message: "Ce mot de passe est trop faible ou trop courant. Choisissez-en un plus long, avec lettres et chiffres." };
+  if (code === "email_address_invalid" || code === "validation_failed" || m.includes("invalid format") || m.includes("unable to validate email") || m.includes("is invalid"))
+    return { status: 400, code: "email_address_invalid", message: "Cette adresse e-mail n'est pas acceptée. Vérifiez-la ou utilisez-en une autre." };
+  if (code === "over_email_send_rate_limit" || code === "over_request_rate_limit" || error.status === 429 || m.includes("rate limit"))
+    return { status: 429, code: "rate_limited", message: "Trop de demandes pour le moment. Réessayez dans quelques minutes." };
+  if (code === "email_address_not_authorized" || m.includes("sending confirmation") || m.includes("error sending") || m.includes("smtp") || code === "unexpected_failure")
+    return { status: 503, code: "email_not_sent", message: "L'e-mail de confirmation n'a pas pu être envoyé. Réessayez plus tard ou contactez-nous." };
+  if (code === "email_not_confirmed" || m.includes("email not confirmed"))
+    return { status: 403, code: "email_not_confirmed", message: "Votre adresse e-mail n'est pas encore confirmée. Ouvrez l'e-mail que nous vous avons envoyé." };
+  if (code === "invalid_credentials" || m.includes("invalid login") || m.includes("invalid credentials"))
+    return { status: 401, code: "invalid_credentials", message: "E-mail ou mot de passe incorrect." };
+  return { status: 500, code: code || "unknown", message: "Une erreur est survenue. Réessayez dans un instant ou contactez-nous." };
+}
+
+export const loginLimiter = makeLimiter(10, 15 * 60 * 1000); // par adresse IP
+export const loginEmailLimiter = makeLimiter(6, 15 * 60 * 1000); // par e-mail (contre l'essai de mots de passe)
+export const registerLimiter = makeLimiter(8, 60 * 60 * 1000);
+export const mailLimiter = makeLimiter(4, 60 * 60 * 1000); // e-mails envoyés (oubli, renvoi) : par e-mail ou IP
 export const orderLimiter = makeLimiter(20, 60 * 60 * 1000);

@@ -1,5 +1,5 @@
 import { clientIp, json, sameOrigin, supabaseFor } from "@/lib/admin-server";
-import { emailFor, phoneDigits, profileOf, registerLimiter, validDigits, writeCustomerSession } from "@/lib/customer-server";
+import { authFailure, cleanEmail, originOf, passwordProblem, profileOf, registerLimiter, writeCustomerSession } from "@/lib/customer-server";
 import { clean, cleanPhone } from "@/lib/lead-clean";
 
 export async function POST(req: Request) {
@@ -13,39 +13,43 @@ export async function POST(req: Request) {
 
   const first = clean(b?.first_name, 80);
   const last = clean(b?.last_name, 80);
-  const phoneRaw = typeof b?.phone === "string" ? b.phone : "";
+  const email = cleanEmail(b?.email);
+  const phone = cleanPhone(b?.phone);
   const password = typeof b?.password === "string" ? b.password : "";
-  const digits = phoneDigits(phoneRaw);
 
   if (!first || !last) return json({ error: "Indiquez votre prénom et votre nom." }, 400);
-  if (!validDigits(digits)) return json({ error: "Numéro de téléphone invalide." }, 400);
-  if (password.length < 8 || password.length > 72) return json({ error: "Le mot de passe doit contenir au moins 8 caractères." }, 400);
+  if (!email) return json({ error: "Indiquez une adresse e-mail valable." }, 400);
+  if (!phone) return json({ error: "Indiquez un numéro de téléphone valable (pour la livraison)." }, 400);
+  const weak = passwordProblem(password);
+  if (weak) return json({ error: weak }, 400);
 
   registerLimiter.record(ip);
   const anon = supabaseFor();
-  if (!anon) return json({ error: "Configuration Supabase manquante." }, 500);
+  if (!anon) return json({ error: "Le service de comptes n'est pas configuré." }, 500);
 
+  const origin = originOf(req);
   const { data, error } = await anon.auth.signUp({
-    email: emailFor(digits),
+    email,
     password,
-    options: { data: { first_name: first, last_name: last, phone: cleanPhone(phoneRaw) ?? digits, address: "" } },
+    options: {
+      data: { first_name: first, last_name: last, phone, address: "" },
+      ...(origin ? { emailRedirectTo: `${origin}/compte` } : {}),
+    },
   });
 
   if (error) {
-    console.error("[compte] inscription refusée :", error.code ?? "", error.message);
-    const m = error.message.toLowerCase();
-    if (error.code === "user_already_exists" || m.includes("already") || m.includes("registered")) {
-      return json({ error: "Un compte existe déjà avec ce numéro. Connectez-vous." }, 409);
-    }
-    if (error.code === "signup_disabled" || m.includes("signups not allowed") || m.includes("disabled")) {
-      return json({ error: "La création de compte est désactivée pour le moment." }, 403);
-    }
-    return json({ error: "La création du compte a échoué. Réessayez, ou contactez-nous." }, 400);
+    const f = authFailure(error);
+    console.error("[compte] inscription refusée :", error.code ?? "", error.status ?? "", error.message);
+    return json({ error: f.message, code: f.code }, f.status);
   }
-  if (!data.session || !data.user) {
-    console.error("[compte] compte créé sans session : la confirmation par e-mail est activée dans Supabase");
-    return json({ error: "Compte créé, mais il n'est pas encore activable (configuration en cours). Contactez-nous." }, 503);
+
+  // Supabase renvoie un utilisateur « fantôme » (sans identité) quand l'adresse existe déjà
+  if (data.user && Array.isArray(data.user.identities) && data.user.identities.length === 0) {
+    return json({ error: "Un compte existe déjà avec cet e-mail. Connectez-vous, ou utilisez « Mot de passe oublié ».", code: "user_already_exists" }, 409);
   }
+
+  // Confirmation par e-mail activée dans Supabase : le compte attend le clic sur le lien reçu
+  if (!data.session || !data.user) return json({ ok: true, needsConfirmation: true });
 
   await writeCustomerSession(data.session.access_token, data.session.refresh_token, data.session.expires_in);
   return json({ ok: true, profile: profileOf(data.user) });

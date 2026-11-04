@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 
-export type Profile = { first_name: string; last_name: string; phone: string; address: string };
+export type Profile = { first_name: string; last_name: string; phone: string; address: string; email: string };
 
 let cache: Promise<Profile | null> | null = null;
 

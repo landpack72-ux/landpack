@@ -1291,6 +1291,91 @@ const FIELDS = [
   ["address", "Adresse (utilisée aussi pour la carte Google)", "Quartier, ville"],
 ] as const;
 
+
+type AuthStatus = { ok: boolean; error?: string; signupAllowed?: boolean; emailEnabled?: boolean; autoconfirm?: boolean };
+
+function StatusRow({ tone, tag, title, children }: { tone: "ok" | "warn" | "bad"; tag: string; title: string; children: React.ReactNode }) {
+  const cls = tone === "ok" ? "bg-water text-cream" : tone === "warn" ? "bg-kraft text-ink" : "bg-red-600 text-white";
+  return (
+    <li className="flex gap-3">
+      <span className={`mt-0.5 h-fit shrink-0 rounded-full px-2.5 py-1 text-xs font-bold ${cls}`}>{tag}</span>
+      <div className="min-w-0">
+        <p className="text-sm font-semibold text-ink">{title}</p>
+        <p className="text-xs leading-relaxed text-ink-soft">{children}</p>
+      </div>
+    </li>
+  );
+}
+
+// Diagnostic des comptes clients : lit la configuration de Supabase et explique en français ce qui bloque éventuellement.
+function AuthDiagnostic() {
+  const [st, setSt] = useState<AuthStatus | null>(null);
+  const [busy, setBusy] = useState(false);
+
+  const check = useCallback(async () => {
+    setBusy(true);
+    const res = await fetch("/api/admin/auth-status", { credentials: "same-origin" }).catch(() => null);
+    setSt(res ? await res.json().catch(() => ({ ok: false, error: "Réponse invalide." })) : { ok: false, error: "Connexion impossible." });
+    setBusy(false);
+  }, []);
+
+  useEffect(() => {
+    // Vérification automatique à l'ouverture de l'onglet.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    check();
+  }, [check]);
+
+  return (
+    <section className="mt-6 rounded-2xl border border-ink/10 bg-white p-5">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div>
+          <h3 className="font-display text-lg text-ink">Comptes clients : vérification</h3>
+          <p className="text-xs text-ink-soft">Contrôle la configuration de Supabase et indique ce qui empêche les clients de créer un compte.</p>
+        </div>
+        <button className={btnGhost} onClick={check} disabled={busy}>{busy ? "Vérification…" : "Vérifier maintenant"}</button>
+      </div>
+
+      {st && !st.ok && <p className="mt-4 rounded-lg bg-red-50 p-3 text-sm text-red-700">{st.error ?? "Vérification impossible."}</p>}
+      {st?.ok && (
+        <ul className="mt-4 space-y-4">
+          {st.signupAllowed ? (
+            <StatusRow tone="ok" tag="OK" title="Création de compte autorisée">Les clients peuvent s&apos;inscrire.</StatusRow>
+          ) : (
+            <StatusRow tone="bad" tag="À corriger" title="Création de compte DÉSACTIVÉE dans Supabase">
+              Les clients reçoivent une erreur à l&apos;inscription. Dans Supabase : Authentication &gt; Sign In / Providers (ou Providers &gt; Email) : activez « Allow new users to sign up », puis enregistrez.
+            </StatusRow>
+          )}
+          {st.emailEnabled ? (
+            <StatusRow tone="ok" tag="OK" title="Connexion par e-mail et mot de passe activée">C&apos;est la méthode utilisée par le site.</StatusRow>
+          ) : (
+            <StatusRow tone="bad" tag="À corriger" title="Le fournisseur « Email » est désactivé">
+              Dans Supabase : Authentication &gt; Sign In / Providers : activez « Email ».
+            </StatusRow>
+          )}
+          {st.autoconfirm ? (
+            <StatusRow tone="warn" tag="À savoir" title="Confirmation par e-mail désactivée">
+              Le compte est actif dès l&apos;inscription, sans vérifier que l&apos;adresse existe. Pratique pour démarrer. Pour plus de sécurité : activez « Confirm email » dans Supabase et configurez l&apos;envoi d&apos;e-mails (ci-dessous).
+            </StatusRow>
+          ) : (
+            <StatusRow tone="warn" tag="À savoir" title="Confirmation par e-mail activée">
+              Chaque client reçoit un e-mail et doit cliquer sur le lien. Il faut un serveur d&apos;envoi (SMTP) configuré dans Supabase : Authentication &gt; Emails &gt; SMTP Settings. Sans lui, l&apos;envoi échoue ou reste limité à quelques e-mails par heure.
+            </StatusRow>
+          )}
+        </ul>
+      )}
+
+      <div className="mt-5 rounded-xl bg-paper p-4 text-xs leading-relaxed text-ink-soft">
+        <p className="font-semibold text-ink">À régler une fois dans Supabase (Authentication &gt; URL Configuration) :</p>
+        <ul className="mt-1 list-disc space-y-0.5 pl-5">
+          <li><strong className="text-ink">Site URL</strong> : l&apos;adresse du site, par exemple https://landpack.ma</li>
+          <li><strong className="text-ink">Redirect URLs</strong> : ajoutez https://landpack.ma/** (et http://localhost:3000/** pour vos essais) : sans cela, les liens des e-mails ne ramènent pas au site.</li>
+          <li><strong className="text-ink">Mots de passe oubliés</strong> : ils fonctionnent par e-mail, donc l&apos;envoi d&apos;e-mails (SMTP) doit être configuré.</li>
+        </ul>
+      </div>
+    </section>
+  );
+}
+
 function SettingsTab({ ctx }: { ctx: Ctx }) {
   const [values, setValues] = useState<Record<string, string>>(DEFAULT_SETTINGS);
   const [busy, setBusy] = useState(false);
@@ -1339,6 +1424,7 @@ function SettingsTab({ ctx }: { ctx: Ctx }) {
       <button className={btn} onClick={save} disabled={busy}>
         {busy ? "Enregistrement…" : "Enregistrer"}
       </button>
+      <AuthDiagnostic />
     </div>
   );
 }
