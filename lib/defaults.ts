@@ -38,6 +38,19 @@ export const DEFAULT_SETTINGS: Record<string, string> = {
   qty_step: "50",
   discount_threshold: "1000",
   discount_percent: "15",
+  // Informations légales (à compléter dans l'admin : Coordonnées & logo > Informations légales)
+  legal_name: "",
+  legal_form: "",
+  legal_ice: "",
+  legal_rc: "",
+  legal_address: "",
+  legal_email: "",
+  legal_publisher: "",
+  legal_cndp: "",
+  legal_data_region: "",
+  legal_retention_orders: "",
+  legal_updated: "",
+  legal_cgv_published: "0", // « 1 » : le lien vers les conditions de vente apparaît dans le pied de page
 };
 
 // Six catégories, six modèles chacune. Les dimensions et photos sont des EXEMPLES

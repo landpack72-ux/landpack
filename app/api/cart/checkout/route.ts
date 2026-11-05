@@ -1,3 +1,4 @@
+import { consentLine } from "@/lib/legal";
 // Validation du panier. Le SERVEUR recalcule tout (prix, quantités, remise) à partir du catalogue :
 // un visiteur ne peut donc pas modifier un prix en trafiquant sa requête. La commande est enregistrée
 // dans la table « leads » ; si le client est connecté, elle est liée à son compte.
@@ -21,6 +22,7 @@ export async function POST(req: Request) {
   if (!b || typeof b !== "object") return json({ error: "Requête invalide." }, 400);
   if (b.website) return json({ ok: true }); // champ piège rempli : robot
 
+  if (b.consent !== true) return json({ error: "Cochez la case pour accepter la politique de confidentialité." }, 400);
   const phone = cleanPhone(b.phone);
   const first = clean(b.first_name, 80);
   const last = clean(b.last_name, 80);
@@ -65,7 +67,8 @@ export async function POST(req: Request) {
 
   const totals = computeTotals(items.map((i) => ({ unit_price: i.unit_price, qty: i.qty })), rules);
   const summary = items.length === 1 ? items[0].title : `${items.length} articles : ${items[0].title} et ${items.length - 1} autre${items.length > 2 ? "s" : ""}`;
-  const message = clean(b.message, 1500);
+  // Le message du client est suivi de la preuve de son consentement (date et version du texte accepté).
+  const message = [clean(b.message, 1500), consentLine()].filter(Boolean).join("\n\n");
 
   // Qui commande ? Un client connecté (commande liée à son compte) ou un visiteur.
   const customer = await requireCustomer();

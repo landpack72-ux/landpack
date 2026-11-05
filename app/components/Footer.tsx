@@ -71,9 +71,16 @@ export default async function Footer() {
       </div>
 
       <div className="border-t border-ink/15">
-        <p className="mx-auto max-w-7xl px-4 pb-20 pt-5 font-body text-sm text-ink-soft sm:px-6 sm:pb-5 lg:px-10">
-          © {new Date().getFullYear()} Landpack. {t.note}
-        </p>
+        <div className="mx-auto flex max-w-7xl flex-col gap-3 px-4 pb-20 pt-5 sm:flex-row sm:items-center sm:justify-between sm:px-6 sm:pb-5 lg:px-10">
+          <p className="font-body text-sm text-ink-soft">
+            © {new Date().getFullYear()} Landpack. {t.note}
+          </p>
+          <nav aria-label="Informations légales" className="flex flex-wrap gap-x-5 gap-y-1 font-body text-sm text-ink-soft">
+            <Link href="/confidentialite" className="py-1 hover:text-water hover:underline">Confidentialité et cookies</Link>
+            <Link href="/mentions-legales" className="py-1 hover:text-water hover:underline">Mentions légales</Link>
+            {s.legal_cgv_published === "1" && <Link href="/conditions-de-vente" className="py-1 hover:text-water hover:underline">Conditions de vente</Link>}
+          </nav>
+        </div>
       </div>
     </footer>
   );

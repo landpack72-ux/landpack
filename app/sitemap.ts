@@ -10,6 +10,8 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const urls: { path: string; priority: number }[] = [
     { path: "", priority: 1 },
     { path: "/devis", priority: 0.6 },
+    { path: "/confidentialite", priority: 0.2 },
+    { path: "/mentions-legales", priority: 0.2 },
     ...categories.map((c) => ({ path: `/categorie/${c.slug}`, priority: 0.9 })),
     ...categories.flatMap((c) =>
       c.items.flatMap((p) => (p.id ? [{ path: `/produit/${p.id}`, priority: 0.7 }] : [])),

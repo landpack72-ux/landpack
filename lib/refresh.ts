@@ -11,6 +11,9 @@ export function refreshSite() {
     ["/produit/[id]", "page"],
     ["/devis", "page"],
     ["/panier", "page"],
+    ["/confidentialite", "page"],
+    ["/mentions-legales", "page"],
+    ["/conditions-de-vente", "page"],
     ["/sitemap.xml", undefined],
     ["/api/pricing", undefined],
   ] as const) {

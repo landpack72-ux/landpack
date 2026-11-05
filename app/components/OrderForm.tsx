@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import ConsentCheck from "./ConsentCheck";
 import { useId, useState, type FormEvent } from "react";
 import { submitLead, uploadCustomerLogo, uploadCustomerPhoto } from "@/lib/leads";
 import { useAccount } from "@/lib/use-account";
@@ -106,6 +107,7 @@ export default function OrderForm({
       message: get("message"),
       source,
       trap: get("website"),
+      consent: get("consent") === "on",
     };
 
     let ok = false;
@@ -119,7 +121,7 @@ export default function OrderForm({
         body: JSON.stringify({
           first_name: order.firstName, last_name: order.lastName, product: order.product, quantity: order.quantity,
           is_custom: true, logo_path: order.logoPath, photo_path: order.photoPath, phone: order.phone, address: order.address,
-          message: order.message, source: order.source, website: order.trap,
+          message: order.message, source: order.source, website: order.trap, consent: order.consent,
         }),
       }).catch(() => null);
       ok = !!res?.ok;
@@ -237,6 +239,7 @@ export default function OrderForm({
       </div>
 
       {/* Champ piège pour les robots : invisible pour les visiteurs */}
+      <ConsentCheck id={`${uid}-consent`} />
       <div aria-hidden className="absolute -left-[9999px] h-0 w-0 overflow-hidden">
         <label htmlFor={`${uid}-website`}>Ne pas remplir</label>
         <input id={`${uid}-website`} name="website" type="text" tabIndex={-1} autoComplete="off" />
@@ -251,7 +254,6 @@ export default function OrderForm({
             <Link href="/compte?tab=connexion" className="font-semibold text-water underline">Se connecter</Link> pour préremplir ce formulaire.
           </>
         )}{" "}
-        Vos informations servent uniquement à traiter votre commande.
       </p>
       {problem && <p className="font-body text-sm text-red-700">{problem}</p>}
 

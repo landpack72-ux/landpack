@@ -1,6 +1,7 @@
 import { clientIp, json, sameOrigin, supabaseFor } from "@/lib/admin-server";
 import { authFailure, cleanEmail, originOf, passwordProblem, profileOf, registerLimiter, writeCustomerSession } from "@/lib/customer-server";
 import { clean, cleanPhone } from "@/lib/lead-clean";
+import { CONSENT_VERSION } from "@/lib/legal";
 
 async function handle(req: Request) {
   if (!sameOrigin(req)) return json({ error: "Requête refusée." }, 403);
@@ -22,6 +23,7 @@ async function handle(req: Request) {
   if (!phone) return json({ error: "Indiquez un numéro de téléphone valable (pour la livraison)." }, 400);
   const weak = passwordProblem(password);
   if (weak) return json({ error: weak }, 400);
+  if (b?.consent !== true) return json({ error: "Cochez la case pour accepter la politique de confidentialité." }, 400);
 
   registerLimiter.record(ip);
   const anon = supabaseFor();
@@ -32,7 +34,7 @@ async function handle(req: Request) {
     email,
     password,
     options: {
-      data: { first_name: first, last_name: last, phone, address: "" },
+      data: { first_name: first, last_name: last, phone, address: "", privacy_accepted_at: new Date().toISOString(), privacy_version: CONSENT_VERSION },
       ...(origin ? { emailRedirectTo: `${origin}/compte` } : {}),
     },
   });

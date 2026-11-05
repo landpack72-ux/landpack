@@ -3,6 +3,7 @@
 // Les règles RLS de Supabase restent la dernière barrière (elles s'appliquent à l'utilisateur connecté).
 
 import { json, requireAdmin, sameOrigin } from "@/lib/admin-server";
+import { leadFilePaths } from "@/lib/lead-files";
 import { refreshSite } from "@/lib/refresh";
 
 const TABLES = new Set(["site_sections", "categories", "products", "site_settings", "leads"]);
@@ -73,7 +74,23 @@ export async function POST(req: Request) {
   for (const o of order) q = q.order(o.column, { ascending: o.ascending !== false });
   if (typeof b.limit === "number" && b.limit > 0 && b.limit <= 1000) q = q.limit(b.limit);
 
+  // Supprimer une demande supprime aussi ses logos et photos du stockage privé (la politique de confidentialité le promet).
+  // On lit les chemins AVANT de supprimer ; les fichiers ne sont effacés que si la suppression de la demande a réussi.
+  let filePaths: string[] = [];
+  if (action === "delete" && table === "leads") {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    let sel: any = admin.db.from("leads").select("*");
+    for (const f of filters) sel = sel.eq(f.column, f.value);
+    const { data: rows } = await sel;
+    filePaths = ((rows ?? []) as Parameters<typeof leadFilePaths>[0][]).flatMap(leadFilePaths);
+  }
+
   const { data, error, count } = await q;
+
+  if (!error && filePaths.length > 0) {
+    const { error: rmError } = await admin.db.storage.from("customer-logos").remove(filePaths);
+    if (rmError) console.error("[admin] fichiers non supprimés :", rmError.message);
+  }
 
   // Une modification du contenu public met le site à jour tout de suite.
   if (!error && action !== "select" && PUBLIC_TABLES.has(table)) {

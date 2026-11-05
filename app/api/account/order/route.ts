@@ -4,6 +4,7 @@
 import { json, sameOrigin } from "@/lib/admin-server";
 import { orderLimiter, requireCustomer } from "@/lib/customer-server";
 import { LOGO_PATH, clean, cleanPhone, cleanQuantity } from "@/lib/lead-clean";
+import { consentLine } from "@/lib/legal";
 
 export async function POST(req: Request) {
   if (!sameOrigin(req)) return json({ error: "Requête refusée." }, 403);
@@ -14,6 +15,7 @@ export async function POST(req: Request) {
   const b = await req.json().catch(() => null);
   if (!b || b.website) return json({ ok: true }); // champ piège
 
+  if (b.consent !== true) return json({ error: "Cochez la case pour accepter la politique de confidentialité." }, 400);
   const phone = cleanPhone(b.phone);
   if (!phone) return json({ error: "Numéro de téléphone invalide." }, 400);
   const logoPath = typeof b.logo_path === "string" && LOGO_PATH.test(b.logo_path) ? b.logo_path : null;
@@ -31,7 +33,7 @@ export async function POST(req: Request) {
     ...(photoPath ? { photo_path: photoPath } : {}),
     phone,
     address: clean(b.address, 300),
-    message: clean(b.message, 4000),
+    message: [clean(b.message, 3800), consentLine()].filter(Boolean).join("\n\n"),
     source: (clean(b.source, 80) ?? "Commande"),
   };
   let { error } = await c.db.from("leads").insert(row);

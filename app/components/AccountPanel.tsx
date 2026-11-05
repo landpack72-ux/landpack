@@ -2,6 +2,7 @@
 
 import { useEffect, useState, type FormEvent } from "react";
 import { passwordChecks, passwordProblem } from "@/lib/password-rules";
+import ConsentCheck from "./ConsentCheck";
 import { fmtInt, money } from "@/lib/pricing";
 import { notifyAccountChanged, useAccount, type Profile } from "@/lib/use-account";
 
@@ -164,7 +165,7 @@ function AuthForms() {
     }
     setBusy(true);
     const url = kind === "login" ? "/api/account/login" : kind === "register" ? "/api/account/register" : "/api/account/forgot";
-    const r = await post(url, { ...d, email: mail, password: kind === "login" ? pass : pass });
+    const r = await post(url, { ...d, email: mail, password: pass, ...(kind === "register" ? { consent: d.consent === "on" } : {}) });
     setBusy(false);
     if (kind === "forgot") return r.ok ? go("reset-sent") : setError(r.error ?? "Une erreur est survenue.");
     if (r.ok && r.needsConfirmation) return go("confirm");
@@ -247,13 +248,13 @@ function AuthForms() {
             <PasswordInput id="r-pass2" name="password2" value={pass2} onChange={setPass2} autoComplete="new-password" />
             {pass2 && pass !== pass2 && <p className="mt-1 font-body text-xs text-red-700">Les deux mots de passe ne sont pas identiques.</p>}
           </div>
+          <ConsentCheck id="r-consent" />
           <div aria-hidden className="absolute -left-[9999px] h-0 w-0 overflow-hidden">
             <label htmlFor="r-website">Ne pas remplir</label>
             <input id="r-website" name="website" type="text" tabIndex={-1} autoComplete="off" />
           </div>
           {error && <p role="alert" className="font-body text-sm text-red-700">{error}</p>}
           <button className={primary} disabled={busy}>{busy ? "Création…" : "Créer mon compte"}</button>
-          <p className="font-body text-xs text-ink-soft">Vos informations servent uniquement à gérer votre compte et vos commandes.</p>
         </form>
       )}
 

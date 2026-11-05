@@ -6,6 +6,7 @@ import { clearCart, removeLine, setLineQty, useCart, type CartLine } from "@/lib
 import { computeTotals, isValidQty, money, piecesLabel, snapQty, type PricingRules, fmtInt } from "@/lib/pricing";
 import { useAccount } from "@/lib/use-account";
 import Pic from "./Pic";
+import ConsentCheck from "./ConsentCheck";
 
 type PricingData = {
   rules: PricingRules;
@@ -81,6 +82,7 @@ export default function CartPanel() {
           address: get("address"),
           message: get("message"),
           website: get("website"),
+          consent: get("consent") === "on",
           items: lines.map((l) => ({ id: l.id, qty: l.qty, logo_path: l.logoPath, photo_path: l.photoPath, note: l.note })),
         }),
       });
@@ -273,6 +275,7 @@ export default function CartPanel() {
             <label htmlFor="p-msg" className={label}>Précisions (facultatif)</label>
             <textarea id="p-msg" name="message" rows={2} maxLength={1000} className={field} />
           </div>
+          <ConsentCheck id="p-consent" />
           <div aria-hidden className="absolute -left-[9999px] h-0 w-0 overflow-hidden">
             <label htmlFor="p-website">Ne pas remplir</label>
             <input id="p-website" name="website" type="text" tabIndex={-1} autoComplete="off" />

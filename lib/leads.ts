@@ -5,6 +5,7 @@
 // Aucune adresse e-mail n'est demandée ni conservée.
 
 import { getBrowserClient } from "./browser";
+import { consentLine } from "./legal";
 import { toWebp } from "./image-client";
 import { LOGO_PATH, clean, cleanPhone, cleanQuantity } from "./lead-clean";
 
@@ -24,6 +25,8 @@ export type LeadInput = {
   source: string;
   /** Champ piège invisible : rempli uniquement par des robots. */
   trap?: string;
+  /** Le client a coché « J'ai lu et j'accepte la politique de confidentialité ». */
+  consent?: boolean;
 };
 
 export type LeadResult = "ok" | "error" | "wait";
@@ -65,6 +68,7 @@ export const uploadCustomerPhoto = (file: File) => uploadPrivateImage(file, 0.82
 export async function submitLead(input: LeadInput): Promise<LeadResult> {
   // Un robot a rempli le champ invisible : on fait semblant que tout va bien.
   if (input.trap) return "ok";
+  if (input.consent !== true) return "error"; // sans acceptation de la politique de confidentialité, rien n'est enregistré
 
   const phone = cleanPhone(input.phone);
   if (!phone) return "error";
@@ -94,7 +98,7 @@ export async function submitLead(input: LeadInput): Promise<LeadResult> {
       ...(photoPath ? { photo_path: photoPath } : {}),
       phone,
       address: clean(input.address, 300),
-      message: clean(input.message, 4000),
+      message: [clean(input.message, 3800), consentLine()].filter(Boolean).join("\n\n"),
       source: input.source.slice(0, 80),
     };
     let { error } = await client.from("leads").insert(row);

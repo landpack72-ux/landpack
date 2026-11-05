@@ -7,6 +7,7 @@ import { DEFAULT_CATEGORIES, DEFAULT_SETTINGS, defaultProducts, type Category, t
 import { adminDb } from "./api";
 import { uploadImage } from "./image";
 import { PRESETS, type ImagePreset } from "@/lib/images";
+import { CONSENT_LINE_RE, LEGAL_FIELDS, legalMissing } from "@/lib/legal";
 
 type Row<T> = T & { id: string };
 type SectionRow = {
@@ -493,7 +494,7 @@ function LeadsTab({ ctx, onCount }: { ctx: Ctx; onCount: (n: number) => void }) 
   }
 
   async function remove(l: Lead) {
-    if (!confirm("Supprimer cette demande définitivement ?")) return;
+    if (!confirm("Supprimer cette demande définitivement ? Son logo et sa photo seront aussi effacés du stockage.")) return;
     const { error } = await adminDb.from("leads").delete().eq("id", l.id);
     if (error) ctx.notify("Erreur : " + error.message, false);
     await load();
@@ -535,7 +536,8 @@ function LeadsTab({ ctx, onCount }: { ctx: Ctx; onCount: (n: number) => void }) 
       {shown.map((l) => {
         const who = `${l.first_name ?? ""} ${l.last_name ?? ""}`.trim() || l.name || "Sans nom";
         const files = attachmentsOf(l);
-        const shownMessage = (l.message ?? "").replace(UUID_FILE, "fichier joint").trim();
+        const consent = /Consentement à la politique de confidentialité \(version ([^)]*)\) : oui, le (\S+)/.exec(l.message ?? "");
+        const shownMessage = (l.message ?? "").replace(CONSENT_LINE_RE, "").replace(UUID_FILE, "fichier joint").trim();
         return (
           <article
             key={l.id}
@@ -630,6 +632,12 @@ function LeadsTab({ ctx, onCount }: { ctx: Ctx; onCount: (n: number) => void }) 
                 <h4 className={sectionTitle}>Précisions du client</h4>
                 <p className="mt-2 whitespace-pre-wrap rounded-xl bg-paper p-3.5 text-sm text-ink [overflow-wrap:anywhere]">{shownMessage}</p>
               </section>
+            )}
+
+            {consent && (
+              <p className="border-t border-ink/10 px-5 py-3 text-xs text-ink-soft">
+                Politique de confidentialité acceptée le {new Date(consent[2]).toLocaleString("fr-FR", { dateStyle: "long", timeStyle: "short" })} (version {consent[1]}).
+              </p>
             )}
 
             <footer className="flex flex-wrap gap-2 border-t border-ink/10 bg-paper px-5 py-3.5">
@@ -1476,6 +1484,38 @@ function SettingsTab({ ctx }: { ctx: Ctx }) {
           Image convertie en WebP (le fond transparent est conservé). Par défaut, le site utilise le fichier public/assets/logo.webp.
         </p>
       </div>
+      <section className="rounded-xl border border-ink/10 bg-white p-4">
+        <h3 className="font-display text-lg text-ink">Informations légales</h3>
+        <p className="mt-1 text-xs leading-relaxed text-ink-soft">
+          Elles s&apos;affichent sur les pages <a className="font-semibold text-water underline" href="/mentions-legales" target="_blank" rel="noopener noreferrer">Mentions légales</a> et{" "}
+          <a className="font-semibold text-water underline" href="/confidentialite" target="_blank" rel="noopener noreferrer">Confidentialité et cookies</a>. Tant qu&apos;un champ obligatoire est vide, la page affiche un repère « à compléter ».
+        </p>
+        {(() => {
+          const missing = legalMissing(values);
+          return missing.length > 0 ? (
+            <p className="mt-3 rounded-lg bg-kraft/40 p-3 text-xs leading-relaxed text-ink">
+              <strong>{missing.length} information{missing.length > 1 ? "s" : ""} à compléter avant de mettre ces pages en avant :</strong> {missing.map((f) => f.label.replace(/ \(.*\)$/, "")).join(" · ")}.
+            </p>
+          ) : (
+            <p className="mt-3 rounded-lg bg-paper p-3 text-xs font-semibold text-water">Toutes les informations obligatoires sont renseignées.</p>
+          );
+        })()}
+        <div className="mt-4 space-y-4">
+          {LEGAL_FIELDS.map((f) => (
+            <label key={f.key} className="block">
+              <span className="mb-1 block text-sm font-medium">{f.label}{f.required ? " *" : ""}</span>
+              <input className={input} value={values[f.key] ?? ""} placeholder={f.placeholder} onChange={(e) => setValues({ ...values, [f.key]: e.target.value })} />
+            </label>
+          ))}
+          <label className="flex items-start gap-2 text-sm">
+            <input type="checkbox" className="mt-1" checked={values.legal_cgv_published === "1"} onChange={(e) => setValues({ ...values, legal_cgv_published: e.target.checked ? "1" : "0" })} />
+            <span>
+              Publier les <a className="font-semibold text-water underline" href="/conditions-de-vente" target="_blank" rel="noopener noreferrer">conditions de vente</a> (le lien apparaît dans le pied de page).
+              <span className="mt-0.5 block text-xs text-ink-soft">Cette page contient des passages à rédiger (surlignés). Ne la publiez qu&apos;une fois complétée et relue par un conseil juridique.</span>
+            </span>
+          </label>
+        </div>
+      </section>
       <button className={btn} onClick={save} disabled={busy}>
         {busy ? "Enregistrement…" : "Enregistrer"}
       </button>
