@@ -36,11 +36,16 @@ const nextConfig: NextConfig = {
   },
   // Anciennes pages supprimées : on renvoie les visiteurs (et Google) vers l'accueil.
   async redirects() {
-    return ["/personnalisation", "/solutions-machines", "/sur-mesure"].map((source) => ({
-      source,
-      destination: "/",
-      permanent: true,
-    }));
+    return [
+      ...["/personnalisation", "/solutions-machines", "/sur-mesure"].map((source) => ({
+        source,
+        destination: "/",
+        permanent: true,
+      })),
+      // Filet de sécurité : si l'adresse du site est saisie avec « /** » dans Supabase (erreur fréquente), les liens des
+      // e-mails deviennent « landpack.ma/**/compte/… ». On les redirige vers la bonne page, en gardant le jeton.
+      { source: "/\\*\\*/:path*", destination: "/:path*", permanent: false },
+    ];
   },
   async headers() {
     if (!isProd) return []; // en développement, ces règles gêneraient le rechargement à chaud
