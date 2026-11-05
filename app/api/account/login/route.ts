@@ -1,7 +1,7 @@
 import { clientIp, json, sameOrigin, supabaseFor } from "@/lib/admin-server";
 import { authFailure, cleanEmail, loginEmailLimiter, loginLimiter, profileOf, writeCustomerSession } from "@/lib/customer-server";
 
-export async function POST(req: Request) {
+async function handle(req: Request) {
   if (!sameOrigin(req)) return json({ error: "Requête refusée." }, 403);
 
   const ip = clientIp(req);
@@ -33,4 +33,13 @@ export async function POST(req: Request) {
   loginEmailLimiter.clear(email);
   await writeCustomerSession(data.session.access_token, data.session.refresh_token, data.session.expires_in);
   return json({ ok: true, profile: profileOf(data.user) });
+}
+
+export async function POST(req: Request) {
+  try {
+    return await handle(req);
+  } catch (e) {
+    console.error("[compte] incident imprévu (%s) :", "login", e instanceof Error ? e.message : e);
+    return json({ error: "Une erreur technique est survenue. Réessayez dans un instant ou contactez-nous.", code: "server_error" }, 500);
+  }
 }

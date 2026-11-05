@@ -22,8 +22,11 @@ export async function post(url: string, body: unknown): Promise<Result> {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(body),
     });
-    const j = await res.json().catch(() => ({}));
-    return res.ok && j.ok ? { ok: true, needsConfirmation: !!j.needsConfirmation } : { ok: false, error: j.error ?? "Une erreur est survenue.", needsConfirmation: !!j.needsConfirmation };
+    const j = await res.json().catch(() => null);
+    if (res.ok && j?.ok) return { ok: true, needsConfirmation: !!j.needsConfirmation };
+    // Réponse sans message lisible (panne de l'hébergeur, délai dépassé…) : on affiche le code pour pouvoir diagnostiquer.
+    const technical = !j?.error ? ` (code ${res.status}). Réessayez dans un instant ; si cela continue, contactez-nous en donnant ce code.` : "";
+    return { ok: false, error: j?.error ?? `Le service est momentanément indisponible${technical}`, needsConfirmation: !!j?.needsConfirmation };
   } catch {
     return { ok: false, error: "Connexion impossible. Vérifiez votre réseau et réessayez." };
   }

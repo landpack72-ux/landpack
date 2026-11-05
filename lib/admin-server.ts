@@ -19,7 +19,11 @@ export function supabaseFor(token?: string): SupabaseClient | null {
   if (!URL_ || !ANON) return null;
   return createClient(URL_, ANON, {
     auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false },
-    global: token ? { headers: { Authorization: `Bearer ${token}` } } : undefined,
+    global: {
+      ...(token ? { headers: { Authorization: `Bearer ${token}` } } : {}),
+      // Au-delà de 9 s on abandonne : le client reçoit un message clair au lieu d'une page d'erreur de l'hébergeur.
+      fetch: (input, init) => fetch(input, { ...init, signal: AbortSignal.timeout(9000) }),
+    },
   });
 }
 

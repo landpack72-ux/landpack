@@ -116,6 +116,8 @@ export function authFailure(error: { code?: string; message: string; status?: nu
     return { status: 503, code: "email_not_sent", message: "L'e-mail de confirmation n'a pas pu être envoyé. Réessayez plus tard ou contactez-nous." };
   if (code === "email_not_confirmed" || m.includes("email not confirmed"))
     return { status: 403, code: "email_not_confirmed", message: "Votre adresse e-mail n'est pas encore confirmée. Ouvrez l'e-mail que nous vous avons envoyé." };
+  if (m.includes("aborted") || m.includes("timeout") || m.includes("timed out") || m.includes("fetch failed") || m.includes("retryable"))
+    return { status: 504, code: "timeout", message: "Le service met trop de temps à répondre (souvent l'envoi de l'e-mail). Patientez une minute et réessayez ; si le problème continue, contactez-nous." };
   if (code === "invalid_credentials" || m.includes("invalid login") || m.includes("invalid credentials"))
     return { status: 401, code: "invalid_credentials", message: "E-mail ou mot de passe incorrect." };
   return { status: 500, code: code || "unknown", message: "Une erreur est survenue. Réessayez dans un instant ou contactez-nous." };

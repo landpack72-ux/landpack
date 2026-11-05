@@ -10,53 +10,27 @@ const label = "block font-body text-xs font-semibold uppercase tracking-wide tex
 const primary =
   "w-full rounded-md bg-water px-4 py-3 text-sm font-semibold text-cream transition-colors hover:bg-water-dark disabled:opacity-60";
 
-// Page ouverte par le lien « Mot de passe oublié » reçu par e-mail : le client choisit un nouveau mot de passe.
-export default function ResetPasswordPanel() {
-  const [tokens, setTokens] = useState<{ access: string; refresh: string } | null | "none">(null);
+// Formulaire de choix du nouveau mot de passe (jetons déjà vérifiés par le serveur).
+export function NewPasswordForm({ access, refresh }: { access: string; refresh: string }) {
   const [pass, setPass] = useState("");
   const [pass2, setPass2] = useState("");
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
   const [done, setDone] = useState(false);
 
-  useEffect(() => {
-    // Les jetons arrivent dans l'adresse (#access_token=…). On les lit, puis on les efface de l'adresse.
-    const p = new URLSearchParams(window.location.hash.replace(/^#/, ""));
-    const access = p.get("access_token");
-    const refresh = p.get("refresh_token");
-    window.history.replaceState(null, "", window.location.pathname);
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    setTokens(access && refresh && !p.get("error") ? { access, refresh } : "none");
-  }, []);
-
   async function submit(e: FormEvent) {
     e.preventDefault();
-    if (!tokens || tokens === "none") return;
     const weak = passwordProblem(pass);
     if (weak) return setError(weak);
     if (pass !== pass2) return setError("Les deux mots de passe ne sont pas identiques.");
     setBusy(true);
     setError("");
-    const r = await post("/api/account/reset", { access_token: tokens.access, refresh_token: tokens.refresh, password: pass });
+    const r = await post("/api/account/reset", { access_token: access, refresh_token: refresh, password: pass });
     setBusy(false);
     if (r.ok) {
       setDone(true);
       notifyAccountChanged();
     } else setError(r.error ?? "Une erreur est survenue.");
-  }
-
-  if (tokens === null) return <p className="font-body text-sm text-ink-soft">Chargement…</p>;
-
-  if (tokens === "none") {
-    return (
-      <div className="mx-auto max-w-md rounded-md border border-ink/10 bg-white p-6">
-        <h2 className="font-display text-lg text-ink">Lien invalide ou expiré</h2>
-        <p className="mt-2 font-body text-sm text-ink-soft">Ce lien n&apos;est plus valable (il ne fonctionne qu&apos;une fois, pendant une heure). Demandez-en un nouveau.</p>
-        <Link href="/compte?tab=oubli" className="mt-4 inline-block rounded-md bg-water px-5 py-2.5 font-body text-sm font-semibold text-cream hover:bg-water-dark">
-          Recevoir un nouveau lien
-        </Link>
-      </div>
-    );
   }
 
   if (done) {
@@ -87,4 +61,33 @@ export default function ResetPasswordPanel() {
       <button className={primary} disabled={busy}>{busy ? "Enregistrement…" : "Enregistrer le mot de passe"}</button>
     </form>
   );
+}
+
+// Page ouverte par l'ancien type de lien (jetons dans l'adresse #access_token=…) : conservée pour les liens déjà envoyés.
+export default function ResetPasswordPanel() {
+  const [tokens, setTokens] = useState<{ access: string; refresh: string } | null | "none">(null);
+
+  useEffect(() => {
+    // Les jetons arrivent dans l'adresse (#access_token=…). On les lit, puis on les efface de l'adresse.
+    const p = new URLSearchParams(window.location.hash.replace(/^#/, ""));
+    const access = p.get("access_token");
+    const refresh = p.get("refresh_token");
+    window.history.replaceState(null, "", window.location.pathname);
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setTokens(access && refresh && !p.get("error") ? { access, refresh } : "none");
+  }, []);
+
+  if (tokens === null) return <p className="font-body text-sm text-ink-soft">Chargement…</p>;
+  if (tokens === "none") {
+    return (
+      <div className="mx-auto max-w-md rounded-md border border-ink/10 bg-white p-6">
+        <h2 className="font-display text-lg text-ink">Lien invalide ou expiré</h2>
+        <p className="mt-2 font-body text-sm text-ink-soft">Ce lien n&apos;est plus valable (il ne fonctionne qu&apos;une fois, pendant une heure). Demandez-en un nouveau.</p>
+        <Link href="/compte?tab=oubli" className="mt-4 inline-block rounded-md bg-water px-5 py-2.5 font-body text-sm font-semibold text-cream hover:bg-water-dark">
+          Recevoir un nouveau lien
+        </Link>
+      </div>
+    );
+  }
+  return <NewPasswordForm access={tokens.access} refresh={tokens.refresh} />;
 }

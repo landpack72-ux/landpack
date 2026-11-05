@@ -3,7 +3,7 @@ import { cleanEmail, mailLimiter, originOf } from "@/lib/customer-server";
 
 // « Mot de passe oublié » : envoie un lien de réinitialisation. La réponse est la même que l'adresse existe ou non
 // (on ne révèle jamais quelles adresses ont un compte).
-export async function POST(req: Request) {
+async function handle(req: Request) {
   if (!sameOrigin(req)) return json({ error: "Requête refusée." }, 403);
   const b = await req.json().catch(() => null);
   const email = cleanEmail(b?.email);
@@ -19,4 +19,13 @@ export async function POST(req: Request) {
   const { error } = await anon.auth.resetPasswordForEmail(email, origin ? { redirectTo: `${origin}/compte/nouveau-mot-de-passe` } : undefined);
   if (error) console.error("[compte] réinitialisation refusée :", error.code ?? "", error.status ?? "", error.message);
   return json({ ok: true });
+}
+
+export async function POST(req: Request) {
+  try {
+    return await handle(req);
+  } catch (e) {
+    console.error("[compte] incident imprévu (%s) :", "forgot", e instanceof Error ? e.message : e);
+    return json({ error: "Une erreur technique est survenue. Réessayez dans un instant ou contactez-nous.", code: "server_error" }, 500);
+  }
 }

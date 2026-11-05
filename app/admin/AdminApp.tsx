@@ -1292,6 +1292,59 @@ const FIELDS = [
 ] as const;
 
 
+type EmailTestResult = { ok: boolean; email?: string; ms?: number; status?: number | null; code?: string | null; message?: string; error?: string };
+
+function emailHint(r: EmailTestResult): string {
+  const m = `${r.code ?? ""} ${r.message ?? ""}`.toLowerCase();
+  if (m.includes("rate") && m.includes("limit")) return "Limite d'envoi atteinte. Patientez une heure, ou relevez la limite dans Supabase : Authentication > Rate Limits.";
+  if (m.includes("redirect") || m.includes("url")) return "L'adresse de retour est refusée. Vérifiez Authentication > URL Configuration : Site URL = https://landpack.ma et Redirect URLs contenant https://landpack.ma/**.";
+  if (m.includes("sending") || m.includes("smtp") || m.includes("unexpected_failure") || m.includes("535") || m.includes("auth")) {
+    return "Supabase n'arrive pas à envoyer par votre service d'e-mails. Vérifiez dans Authentication > Emails > SMTP Settings : Host smtp.resend.com, Port 465, Username resend, Password = la clé Resend (re_…), Sender no-reply@landpack.ma. Dans Resend, le domaine doit être « Verified ».";
+  }
+  if (m.includes("abort") || m.includes("timeout") || m.includes("fetch")) return "Supabase met trop de temps à répondre. Réessayez dans une minute ; si cela se répète, vérifiez le port SMTP (465) et la clé Resend.";
+  return "Notez le message ci-dessus et envoyez-le à votre développeur.";
+}
+
+// Envoie un vrai e-mail de test à l'adresse de l'administrateur et affiche le message EXACT de Supabase s'il échoue.
+function EmailTest() {
+  const [busy, setBusy] = useState(false);
+  const [res, setRes] = useState<EmailTestResult | null>(null);
+
+  async function run() {
+    setBusy(true);
+    setRes(null);
+    const r = await fetch("/api/admin/test-email", { method: "POST", credentials: "same-origin" }).catch(() => null);
+    setRes(r ? await r.json().catch(() => ({ ok: false, error: `Réponse illisible (code ${r.status}).` })) : { ok: false, error: "Connexion impossible." });
+    setBusy(false);
+  }
+
+  return (
+    <div className="mt-5 rounded-xl border border-ink/10 p-4">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div className="min-w-0">
+          <p className="text-sm font-semibold text-ink">Test d&apos;envoi d&apos;e-mail</p>
+          <p className="text-xs text-ink-soft">Envoie un e-mail de test à votre adresse d&apos;administrateur et affiche le résultat exact.</p>
+        </div>
+        <button className={btnGhost} onClick={run} disabled={busy}>{busy ? "Envoi en cours…" : "Envoyer un e-mail de test"}</button>
+      </div>
+      {res?.ok && (
+        <p className="mt-3 rounded-lg bg-paper p-3 text-sm text-ink">
+          <strong className="text-water">Envoi accepté</strong> en {res.ms} ms. Regardez la boîte de réception de {res.email} (et les courriers indésirables) : le message doit arriver en quelques secondes.
+        </p>
+      )}
+      {res && !res.ok && (
+        <div className="mt-3 space-y-2 rounded-lg bg-red-50 p-3 text-sm text-red-800">
+          <p className="font-semibold">L&apos;envoi a échoué{res.ms != null ? ` (après ${res.ms} ms)` : ""}.</p>
+          <p className="rounded bg-white/70 p-2 font-mono text-xs [overflow-wrap:anywhere]">
+            {res.error ?? `${res.status ?? ""} ${res.code ?? ""} ${res.message ?? ""}`.trim()}
+          </p>
+          {!res.error && <p className="text-xs">{emailHint(res)}</p>}
+        </div>
+      )}
+    </div>
+  );
+}
+
 type AuthStatus = { ok: boolean; error?: string; signupAllowed?: boolean; emailEnabled?: boolean; autoconfirm?: boolean };
 
 function StatusRow({ tone, tag, title, children }: { tone: "ok" | "warn" | "bad"; tag: string; title: string; children: React.ReactNode }) {
@@ -1363,6 +1416,8 @@ function AuthDiagnostic() {
           )}
         </ul>
       )}
+
+      <EmailTest />
 
       <div className="mt-5 rounded-xl bg-paper p-4 text-xs leading-relaxed text-ink-soft">
         <p className="font-semibold text-ink">À régler une fois dans Supabase (Authentication &gt; URL Configuration) :</p>

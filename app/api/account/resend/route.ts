@@ -2,7 +2,7 @@ import { clientIp, json, sameOrigin, supabaseFor } from "@/lib/admin-server";
 import { authFailure, cleanEmail, mailLimiter, originOf } from "@/lib/customer-server";
 
 // Renvoie l'e-mail de confirmation (limité : 4 par heure et par adresse).
-export async function POST(req: Request) {
+async function handle(req: Request) {
   if (!sameOrigin(req)) return json({ error: "Requête refusée." }, 403);
   const b = await req.json().catch(() => null);
   const email = cleanEmail(b?.email);
@@ -22,4 +22,13 @@ export async function POST(req: Request) {
     if (f.status !== 500) return json({ error: f.message, code: f.code }, f.status);
   }
   return json({ ok: true }); // même réponse que l'adresse existe ou non
+}
+
+export async function POST(req: Request) {
+  try {
+    return await handle(req);
+  } catch (e) {
+    console.error("[compte] incident imprévu (%s) :", "resend", e instanceof Error ? e.message : e);
+    return json({ error: "Une erreur technique est survenue. Réessayez dans un instant ou contactez-nous.", code: "server_error" }, 500);
+  }
 }
