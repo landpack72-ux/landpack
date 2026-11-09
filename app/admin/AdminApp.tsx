@@ -846,6 +846,40 @@ function ItemEditor({ def, row, canDelete, reload, ctx }: { def: SectionDef; row
 /* Onglet : catalogue = catégories, chacune avec ses modèles           */
 /* ------------------------------------------------------------------ */
 type CatRow = Category & { id: string };
+
+type Orderable = { id: string; sort_order: number };
+type MoveTo = "up" | "down" | "top";
+
+/** Déplace un élément dans une liste déjà triée ; renvoie la liste renumérotée 0, 1, 2… (les égalités disparaissent), ou null si rien ne bouge. */
+function moved<T extends Orderable>(list: T[], id: string, to: MoveTo): T[] | null {
+  const i = list.findIndex((x) => x.id === id);
+  if (i < 0) return null;
+  const j = to === "up" ? i - 1 : to === "down" ? i + 1 : 0;
+  if (j < 0 || j >= list.length || j === i) return null;
+  const next = [...list];
+  const [it] = next.splice(i, 1);
+  next.splice(j, 0, it);
+  return next.map((x, k) => ({ ...x, sort_order: k }));
+}
+
+const byOrder = <T extends Orderable>(a: T, b: T) => a.sort_order - b.sort_order;
+
+// Boutons « En premier / ↑ / ↓ ». Placés dans un <summary>, ils ne doivent pas ouvrir ou fermer la fiche.
+function MoveButtons({ index, total, busy, onMove, what }: { index: number; total: number; busy: boolean; onMove: (to: MoveTo) => void; what: string }) {
+  const b = "inline-flex h-10 min-w-10 items-center justify-center rounded-lg border border-ink/15 bg-white px-2.5 text-sm font-semibold text-ink transition-colors hover:bg-paper disabled:cursor-not-allowed disabled:opacity-35";
+  const go = (to: MoveTo) => (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    onMove(to);
+  };
+  return (
+    <span className="flex shrink-0 items-center gap-1.5">
+      <button type="button" className={b} disabled={busy || index === 0} onClick={go("top")} aria-label={`Mettre ${what} en premier`} title="Mettre en premier">En premier</button>
+      <button type="button" className={b} disabled={busy || index === 0} onClick={go("up")} aria-label={`Monter ${what}`} title="Monter d'une place">↑</button>
+      <button type="button" className={b} disabled={busy || index === total - 1} onClick={go("down")} aria-label={`Descendre ${what}`} title="Descendre d'une place">↓</button>
+    </span>
+  );
+}
 type ModelRow = Product & { id: string };
 
 const slugify = (text: string) =>
@@ -899,6 +933,37 @@ function CatalogueTab({ ctx }: { ctx: Ctx }) {
     load();
   }, [load]);
 
+  const [ordering, setOrdering] = useState(false);
+
+  // Enregistre le nouvel ordre : seules les lignes dont la position change sont mises à jour. Le site se met à jour tout de suite.
+  async function applyOrder(table: "categories" | "products", before: Orderable[], after: Orderable[]) {
+    setOrdering(true);
+    const changed = after.filter((a) => before.find((b) => b.id === a.id)?.sort_order !== a.sort_order);
+    const results = await Promise.all(changed.map((u) => adminDb.from(table).update({ sort_order: u.sort_order }).eq("id", u.id)));
+    const failed = results.find((r) => r.error);
+    if (failed?.error) ctx.notify("Erreur : " + failed.error.message, false);
+    else ctx.notify("Ordre enregistré : le site est à jour.");
+    await load();
+    setOrdering(false);
+  }
+
+  async function moveCategory(id: string, to: MoveTo) {
+    if (!cats || ordering) return;
+    const next = moved(cats, id, to);
+    if (!next) return;
+    setCats(next as CatRow[]);
+    await applyOrder("categories", cats, next);
+  }
+
+  async function moveModel(catId: string, id: string, to: MoveTo) {
+    if (ordering) return;
+    const group = models.filter((m) => m.category_id === catId).sort(byOrder);
+    const next = moved(group, id, to);
+    if (!next) return;
+    setModels((all) => all.map((m) => next.find((n) => n.id === m.id) ?? m));
+    await applyOrder("products", group, next);
+  }
+
   async function addCategory() {
     const slug = `nouvelle-categorie-${Math.random().toString(36).slice(2, 6)}`;
     const { error } = await adminDb
@@ -919,10 +984,34 @@ function CatalogueTab({ ctx }: { ctx: Ctx }) {
         catégorie décochés « Visible » n&apos;apparaissent pas sur le site.
       </p>
       <PricingBox ctx={ctx} />
+
+      <details className="rounded-2xl border border-ink/10 bg-paper p-4" open>
+        <summary className="cursor-pointer text-sm font-medium">Ordre des catégories sur le site</summary>
+        <p className="mt-2 text-xs text-ink-soft">
+          Changez l&apos;ordre avec « En premier », ↑ et ↓ : il s&apos;applique à la page d&apos;accueil et au menu « Catégories », et il est enregistré tout de suite.
+          Pour l&apos;ordre des modèles d&apos;une catégorie, ouvrez-la : chaque modèle a ses propres boutons.
+        </p>
+        <ol className="mt-3 space-y-2">
+          {cats.map((c, i) => (
+            <li key={c.id} className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-ink/10 bg-white p-2.5">
+              <span className="min-w-0 text-sm font-semibold text-ink [overflow-wrap:anywhere]">
+                <span className="mr-2 font-normal text-ink-soft">N° {i + 1}</span>
+                {c.name}
+                {!c.is_active && <span className="ml-2 rounded-full bg-ink/10 px-2 py-0.5 text-xs font-semibold text-ink-soft">Masquée</span>}
+              </span>
+              <MoveButtons index={i} total={cats.length} busy={ordering} onMove={(to) => moveCategory(c.id, to)} what={`la catégorie ${c.name}`} />
+            </li>
+          ))}
+        </ol>
+      </details>
+
       <button className={btn} onClick={addCategory}>+ Ajouter une catégorie</button>
-      {cats.map((c) => (
-        <CategoryBlock key={c.id} cat={c} models={models.filter((m) => m.category_id === c.id)} ctx={ctx} reload={load} />
-      ))}
+      {cats.map((c, i) => {
+        const group = models.filter((m) => m.category_id === c.id).sort(byOrder);
+        return (
+          <CategoryBlock key={c.id} cat={c} position={i + 1} models={group} ctx={ctx} reload={load} ordering={ordering} onMoveModel={(id, to) => moveModel(c.id, id, to)} />
+        );
+      })}
     </div>
   );
 }
@@ -993,7 +1082,9 @@ function Labeled({ text, children }: { text: string; children: React.ReactNode }
   );
 }
 
-function CategoryBlock({ cat, models, ctx, reload }: { cat: CatRow; models: ModelRow[]; ctx: Ctx; reload: () => Promise<void> }) {
+function CategoryBlock({
+  cat, position, models, ctx, reload, ordering, onMoveModel,
+}: { cat: CatRow; position: number; models: ModelRow[]; ctx: Ctx; reload: () => Promise<void>; ordering: boolean; onMoveModel: (id: string, to: MoveTo) => void }) {
   const [c, setC] = useState(cat);
   const [busy, setBusy] = useState(false);
   const set = <K extends keyof Category>(k: K, v: Category[K]) => setC((x) => ({ ...x, [k]: v }));
@@ -1005,7 +1096,6 @@ function CategoryBlock({ cat, models, ctx, reload }: { cat: CatRow; models: Mode
       description: c.description?.trim() || null,
       image_url: c.image_url,
       is_active: c.is_active,
-      sort_order: c.sort_order,
     };
     // Le lien interne de la catégorie (#boites-pizza) suit son nom la première fois.
     const fresh = cat.slug.startsWith("nouvelle-categorie");
@@ -1039,7 +1129,7 @@ function CategoryBlock({ cat, models, ctx, reload }: { cat: CatRow; models: Mode
   return (
     <details className="rounded-2xl border border-ink/10 bg-paper p-4">
       <summary className="cursor-pointer text-sm font-medium">
-        {cat.name} <span className="font-normal text-ink-soft">({models.length} modèle{models.length > 1 ? "s" : ""}{cat.is_active ? "" : ", masquée"})</span>
+        <span className="mr-2 font-normal text-ink-soft">N° {position}</span>{cat.name} <span className="font-normal text-ink-soft">({models.length} modèle{models.length > 1 ? "s" : ""}{cat.is_active ? "" : ", masquée"})</span>
       </summary>
 
       <div className="mt-4 space-y-4">
@@ -1065,10 +1155,6 @@ function CategoryBlock({ cat, models, ctx, reload }: { cat: CatRow; models: Mode
               <input type="checkbox" checked={c.is_active} onChange={(e) => set("is_active", e.target.checked)} />
               Visible
             </label>
-            <label className="flex items-center gap-2 text-sm">
-              Ordre
-              <input className={`${input} w-20`} type="number" value={c.sort_order} onChange={(e) => set("sort_order", Number(e.target.value) || 0)} />
-            </label>
             <button className={btn} onClick={save} disabled={busy}>{busy ? "…" : "Enregistrer la catégorie"}</button>
             <button className={btnGhost} onClick={remove} disabled={busy}>Supprimer la catégorie</button>
           </div>
@@ -1080,8 +1166,11 @@ function CategoryBlock({ cat, models, ctx, reload }: { cat: CatRow; models: Mode
           </p>
           <p className="text-xs text-ink-soft">Cliquez sur un modèle pour le modifier.</p>
         </div>
-        {models.map((m) => (
-          <ModelCard key={m.id} item={m} ctx={ctx} reload={reload} nextOrder={nextOrder} onDuplicated={setJustAdded} startOpen={justAdded === "__dernier__" && m.id === newestId} />
+        {models.map((m, i) => (
+          <ModelCard
+            key={m.id} item={m} ctx={ctx} reload={reload} nextOrder={nextOrder} onDuplicated={setJustAdded} startOpen={justAdded === "__dernier__" && m.id === newestId}
+            position={i + 1} total={models.length} ordering={ordering} onMove={(to) => onMoveModel(m.id, to)}
+          />
         ))}
         <NewModelPanel cat={c} nextOrder={nextOrder} ctx={ctx} reload={reload} onAdded={setJustAdded} />
       </div>
@@ -1092,8 +1181,11 @@ function CategoryBlock({ cat, models, ctx, reload }: { cat: CatRow; models: Mode
 const money2 = (n: number | null | undefined) => (n == null ? "sur devis" : `${Number(n).toFixed(2).replace(".", ",")} Dh`);
 
 function ModelCard({
-  item, ctx, reload, nextOrder, onDuplicated, startOpen,
-}: { item: ModelRow; ctx: Ctx; reload: () => Promise<void>; nextOrder: number; onDuplicated: (id: string) => void; startOpen: boolean }) {
+  item, ctx, reload, nextOrder, onDuplicated, startOpen, position, total, ordering, onMove,
+}: {
+  item: ModelRow; ctx: Ctx; reload: () => Promise<void>; nextOrder: number; onDuplicated: (id: string) => void; startOpen: boolean;
+  position: number; total: number; ordering: boolean; onMove: (to: MoveTo) => void;
+}) {
   const [m, setM] = useState(item);
   const [busy, setBusy] = useState(false);
   const set = <K extends keyof Product>(k: K, v: Product[K]) => setM((x) => ({ ...x, [k]: v }));
@@ -1111,7 +1203,6 @@ function ModelCard({
         unit_price: m.unit_price != null && Number(m.unit_price) >= 0 ? Math.round(Number(m.unit_price) * 100) / 100 : null,
         min_qty: posInt(String(m.min_qty ?? "")),
         is_active: m.is_active,
-        sort_order: m.sort_order,
       })
       .eq("id", m.id);
     if (error) ctx.notify("Erreur : " + error.message, false);
@@ -1153,20 +1244,21 @@ function ModelCard({
   const title = m.dimensions ? `${m.name} – ${m.dimensions}` : m.name;
   return (
     <details open={startOpen || undefined} className="group rounded-xl border border-ink/10 bg-white">
-      <summary className="flex cursor-pointer list-none items-center gap-3 p-3">
+      <summary className="flex cursor-pointer list-none flex-wrap items-center gap-x-3 gap-y-2 p-3">
         <span className="block h-14 w-14 shrink-0 overflow-hidden rounded-lg border border-ink/10 bg-white">
           {m.image_url && (
             // eslint-disable-next-line @next/next/no-img-element
             <img src={m.image_url} alt="" className="h-full w-full object-contain" />
           )}
         </span>
-        <span className="min-w-0 flex-1">
-          <span className="block truncate text-sm font-semibold text-ink">{title}</span>
+        <span className="min-w-[9rem] flex-1">
+          <span className="block text-sm font-semibold text-ink [overflow-wrap:anywhere]">{title}</span>
           <span className="block text-xs text-ink-soft">
-            {money2(m.unit_price)} / pièce · min. {m.min_qty ?? "50"}
+            N° {position} · {money2(m.unit_price)} / pièce · min. {m.min_qty ?? "50"}
           </span>
         </span>
         {!m.is_active && <span className="shrink-0 rounded-full bg-ink/10 px-2 py-0.5 text-xs font-semibold text-ink-soft">Masqué</span>}
+        <MoveButtons index={position - 1} total={total} busy={ordering} onMove={onMove} what={`le modèle ${title}`} />
         <span aria-hidden className="shrink-0 text-ink-soft transition-transform group-open:rotate-180">▾</span>
       </summary>
 
@@ -1203,10 +1295,6 @@ function ModelCard({
           <label className="flex items-center gap-2 text-sm">
             <input type="checkbox" checked={m.is_active} onChange={(e) => set("is_active", e.target.checked)} />
             Visible sur le site
-          </label>
-          <label className="flex items-center gap-2 text-sm">
-            Ordre
-            <input className={`${input} w-20`} type="number" value={m.sort_order} onChange={(e) => set("sort_order", Number(e.target.value) || 0)} />
           </label>
         </div>
         <div className="flex flex-wrap items-center gap-2">
@@ -1488,7 +1576,7 @@ function SettingsTab({ ctx }: { ctx: Ctx }) {
         <h3 className="font-display text-lg text-ink">Informations légales</h3>
         <p className="mt-1 text-xs leading-relaxed text-ink-soft">
           Elles s&apos;affichent sur les pages <a className="font-semibold text-water underline" href="/mentions-legales" target="_blank" rel="noopener noreferrer">Mentions légales</a> et{" "}
-          <a className="font-semibold text-water underline" href="/confidentialite" target="_blank" rel="noopener noreferrer">Confidentialité et cookies</a>. Tant qu&apos;un champ obligatoire est vide, la page affiche un repère « à compléter ».
+          <a className="font-semibold text-water underline" href="/confidentialite" target="_blank" rel="noopener noreferrer">Confidentialité et cookies</a>. Un champ vide est simplement omis de la page : les visiteurs ne voient jamais de trou. Complétez-les avant d&apos;annoncer ces pages.
         </p>
         {(() => {
           const missing = legalMissing(values);

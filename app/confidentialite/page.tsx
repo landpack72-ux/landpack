@@ -3,7 +3,7 @@ import Link from "next/link";
 import { getSettings } from "@/lib/data";
 import { DEFAULT_LEGAL_UPDATED } from "@/lib/legal";
 import { formatPhone } from "@/lib/format";
-import { Fill, LegalPage, Section } from "../components/Legal";
+import { LegalPage, Section } from "../components/Legal";
 
 export const metadata: Metadata = {
   title: { absolute: "Politique de confidentialité et cookies | Landpack" },
@@ -15,7 +15,13 @@ export default async function ConfidentialitePage() {
   const s = await getSettings();
   const email = s.legal_email || s.email;
   const address = s.legal_address || s.address;
-  const mail = email ? <a href={`mailto:${email}`}>{email}</a> : <Fill value="" label="e-mail de contact" />;
+  const tel = <a href={`tel:${s.phone}`}>{formatPhone(s.phone)}</a>;
+  // Les informations non renseignées sont simplement omises : la page reste toujours propre et lisible.
+  const contact = email ? <>par e-mail à <a href={`mailto:${email}`}>{email}</a>, ou par téléphone au {tel}</> : <>par téléphone au {tel}</>;
+  const form = s.legal_form?.trim();
+  const ice = s.legal_ice?.trim();
+  const rc = s.legal_rc?.trim();
+  const region = s.legal_data_region?.trim();
 
   return (
     <LegalPage
@@ -25,12 +31,12 @@ export default async function ConfidentialitePage() {
     >
       <Section title="1. Qui est responsable de vos données ?">
         <p>
-          Le responsable du traitement est <strong><Fill value={s.legal_name} label="raison sociale" /></strong> (<Fill value={s.legal_form} label="forme juridique" />),
-          ICE <Fill value={s.legal_ice} label="ICE" />, RC <Fill value={s.legal_rc} label="registre du commerce" />, dont le siège est situé : {address}.
+          Le responsable du traitement est <strong>{s.legal_name?.trim() || "Landpack"}</strong>
+          {form ? <> ({form})</> : null}
+          {ice ? <>, ICE {ice}</> : null}
+          {rc ? <>, RC {rc}</> : null}, dont le siège est situé : {address}.
         </p>
-        <p>
-          Pour toute question ou pour exercer vos droits : {mail}, ou par téléphone au <a href={`tel:${s.phone}`}>{formatPhone(s.phone)}</a>.
-        </p>
+        <p>Pour toute question ou pour exercer vos droits, contactez-nous {contact}.</p>
         {s.legal_cndp?.trim() && <p>Traitement déclaré à la CNDP sous le n° {s.legal_cndp.trim()}.</p>}
       </Section>
 
@@ -80,7 +86,7 @@ export default async function ConfidentialitePage() {
 
       <Section title="5. Vos données quittent-elles le Maroc ?">
         <p>
-          Nos prestataires techniques hébergent les données hors du Maroc, dans la région suivante : <strong><Fill value={s.legal_data_region} label="pays ou région d'hébergement" /></strong>.
+          Nos prestataires techniques hébergent les données hors du Maroc{region ? <>, dans la région suivante : <strong>{region}</strong></> : null}.
           Ce transfert est soumis aux règles de la loi n° 09-08, que Landpack s&apos;engage à respecter.
         </p>
       </Section>
@@ -88,7 +94,7 @@ export default async function ConfidentialitePage() {
       <Section title="6. Combien de temps conservons-nous vos données ?">
         <ul>
           <li><strong>Compte :</strong> tant que votre compte est actif. Vous pouvez demander sa suppression à tout moment.</li>
-          <li><strong>Commandes et demandes :</strong> <Fill value={s.legal_retention_orders} label="durée de conservation" />.</li>
+          <li><strong>Commandes et demandes :</strong> {s.legal_retention_orders?.trim() || "le temps nécessaire au suivi de la commande, puis selon les obligations légales de conservation"}.</li>
           <li><strong>Logo et photo envoyés :</strong> supprimés une fois votre commande traitée.</li>
           <li><strong>Journaux techniques :</strong> durée courte, fixée par nos hébergeurs.</li>
           <li><strong>Panier :</strong> il reste dans votre navigateur jusqu&apos;à ce que vous le vidiez ou envoyiez votre commande.</li>
@@ -101,7 +107,7 @@ export default async function ConfidentialitePage() {
           et retirer votre consentement. Vous pouvez modifier vos informations et votre mot de passe vous-même depuis <Link href="/compte">Mon compte</Link>.
         </p>
         <p>
-          Pour les autres demandes (accès, suppression du compte, opposition), écrivez à {mail} ou appelez le <a href={`tel:${s.phone}`}>{formatPhone(s.phone)}</a> : nous vous répondons dans les meilleurs délais.
+          Pour les autres demandes (accès, suppression du compte, opposition), contactez-nous {contact} : nous vous répondons dans les meilleurs délais.
           Si vous estimez que vos droits ne sont pas respectés, vous pouvez adresser une réclamation à la Commission Nationale de contrôle de la protection des Données à caractère Personnel (CNDP) : <a href="https://www.cndp.ma" target="_blank" rel="noopener noreferrer">www.cndp.ma</a>.
         </p>
       </Section>

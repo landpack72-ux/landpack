@@ -3,7 +3,7 @@ import Link from "next/link";
 import { getSettings } from "@/lib/data";
 import { DEFAULT_LEGAL_UPDATED } from "@/lib/legal";
 import { formatPhone } from "@/lib/format";
-import { Fill, LegalPage, Section } from "../components/Legal";
+import { LegalPage, Section } from "../components/Legal";
 
 export const metadata: Metadata = {
   title: { absolute: "Mentions légales | Landpack" },
@@ -20,14 +20,14 @@ export default async function MentionsLegalesPage() {
     <LegalPage title="Mentions légales" updated={s.legal_updated || DEFAULT_LEGAL_UPDATED}>
       <Section title="Éditeur du site">
         <ul>
-          <li><strong>Raison sociale :</strong> <Fill value={s.legal_name} label="raison sociale" /></li>
-          <li><strong>Forme juridique :</strong> <Fill value={s.legal_form} label="forme juridique" /></li>
-          <li><strong>ICE :</strong> <Fill value={s.legal_ice} label="ICE" /></li>
-          <li><strong>Registre du commerce :</strong> <Fill value={s.legal_rc} label="registre du commerce" /></li>
+          <li><strong>Raison sociale :</strong> {s.legal_name?.trim() || "Landpack"}</li>
+          {s.legal_form?.trim() && <li><strong>Forme juridique :</strong> {s.legal_form.trim()}</li>}
+          {s.legal_ice?.trim() && <li><strong>ICE :</strong> {s.legal_ice.trim()}</li>}
+          {s.legal_rc?.trim() && <li><strong>Registre du commerce :</strong> {s.legal_rc.trim()}</li>}
           <li><strong>Siège :</strong> {address}</li>
           <li><strong>Téléphone :</strong> <a href={`tel:${s.phone}`}>{formatPhone(s.phone)}</a></li>
-          <li><strong>E-mail :</strong> {email ? <a href={`mailto:${email}`}>{email}</a> : <Fill value="" label="e-mail de contact" />}</li>
-          <li><strong>Directeur de la publication :</strong> <Fill value={s.legal_publisher} label="nom du directeur de la publication" /></li>
+          {email && <li><strong>E-mail :</strong> <a href={`mailto:${email}`}>{email}</a></li>}
+          {s.legal_publisher?.trim() && <li><strong>Directeur de la publication :</strong> {s.legal_publisher.trim()}</li>}
         </ul>
       </Section>
 
