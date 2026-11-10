@@ -5,10 +5,11 @@ import Header from "../../components/Header";
 import Footer from "../../components/Footer";
 import Breadcrumb from "../../components/Breadcrumb";
 import ProductCard from "../../components/ProductCard";
-import Pic from "../../components/Pic";
+import ProductGallery from "../../components/ProductGallery";
 import ProductPurchase from "../../components/ProductPurchase";
 import { getCatalogue, getProduct, getSettings } from "@/lib/data";
 import { modelTitle } from "@/lib/defaults";
+import { allImages } from "@/lib/gallery";
 import { absoluteUrl } from "@/lib/format";
 import { minQty, money, piecesLabel, rulesFrom, fmtInt } from "@/lib/pricing";
 import { pageMetadata } from "@/lib/seo";
@@ -46,6 +47,8 @@ export default async function ProductPage({ params }: Params) {
   const others = c.items.filter((x) => x.id !== p.id).slice(0, 4);
   const discountOn = rules.discountThreshold > 0 && rules.discountPercent > 0;
 
+  const images = allImages(p.image_url, p.gallery);
+
   const jsonLd = {
     "@context": "https://schema.org",
     "@type": "Product",
@@ -54,7 +57,7 @@ export default async function ProductPage({ params }: Params) {
     category: c.name,
     brand: { "@type": "Brand", name: "Landpack" },
     description: p.description || `${title} : ${c.name} personnalisés à votre logo.`,
-    ...(p.image_url ? { image: absoluteUrl(p.image_url) } : {}),
+    ...(images.length > 0 ? { image: images.length === 1 ? absoluteUrl(images[0]) : images.map(absoluteUrl) } : {}),
     ...(p.unit_price != null
       ? { offers: { "@type": "Offer", priceCurrency: "MAD", price: p.unit_price.toFixed(2), availability: "https://schema.org/InStock", url: absoluteUrl(`/produit/${p.id}`) } }
       : {}),
@@ -75,16 +78,9 @@ export default async function ProductPage({ params }: Params) {
         <Breadcrumb items={[{ label: "Accueil", href: "/" }, { label: c.name, href: `/categorie/${c.slug}` }, { label: title }]} />
 
         <div className="mt-6 grid grid-cols-[minmax(0,1fr)] gap-8 lg:grid-cols-2 lg:gap-12">
-          {/* Photo */}
+          {/* Photos */}
           <div>
-            <div className="relative aspect-[4/3] overflow-hidden rounded-md border border-ink/10 bg-white sm:aspect-square lg:sticky lg:top-6">
-              <span className="absolute left-3 top-3 z-10 rounded bg-kraft px-2.5 py-1 font-body text-xs font-semibold text-ink">
-                Personnalisable
-              </span>
-              {p.image_url && (
-                <Pic src={p.image_url} alt={`${title} personnalisable`} preset="product" priority sizes="(min-width: 1024px) 560px, 92vw" className="h-full w-full object-contain p-4" />
-              )}
-            </div>
+            <ProductGallery images={images} alt={`${title} personnalisable`} badge="Personnalisable" />
           </div>
 
           {/* Informations et achat */}

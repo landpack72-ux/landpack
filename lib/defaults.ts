@@ -18,6 +18,7 @@ export type Product = {
   dimensions: string | null;
   description: string | null;
   image_url: string | null;
+  gallery?: string[] | null; // photos supplémentaires (galerie sous la grande photo)
   unit_price: number | null; // prix par pièce en dirhams (ex. 1.20), modifiable depuis l'admin
   price_label: string | null; // ancien champ texte, conservé pour compatibilité
   min_qty: number | null; // quantité minimale (sinon celle du site : 50)

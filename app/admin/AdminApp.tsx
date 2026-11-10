@@ -8,6 +8,7 @@ import { adminDb } from "./api";
 import { uploadImage } from "./image";
 import { PRESETS, type ImagePreset } from "@/lib/images";
 import { CONSENT_LINE_RE, LEGAL_FIELDS, legalMissing } from "@/lib/legal";
+import { MAX_GALLERY, cleanGallery } from "@/lib/gallery";
 
 type Row<T> = T & { id: string };
 type SectionRow = {
@@ -893,17 +894,21 @@ function CatalogueTab({ ctx }: { ctx: Ctx }) {
   const [cats, setCats] = useState<CatRow[] | null>(null);
   const [models, setModels] = useState<ModelRow[]>([]);
   const [problem, setProblem] = useState("");
+  const [galleryOk, setGalleryOk] = useState(true);
   const seeded = useRef(false);
 
   const load = useCallback(async () => {
     const catCols = "id,slug,name,description,image_url,is_active,sort_order";
     const prodCols =
       "id,category_id,name,dimensions,description,image_url,unit_price,price_label,min_qty,custom_price_label,custom_min_qty,is_active,sort_order";
-    const fetchAll = () =>
-      Promise.all([
-        adminDb.from("categories").select(catCols).order("sort_order"),
-        adminDb.from("products").select(prodCols).order("sort_order").order("created_at"),
-      ]);
+    const fetchAll = async () => {
+      const cReq = adminDb.from("categories").select(catCols).order("sort_order");
+      const withGallery = await adminDb.from("products").select(`${prodCols},gallery`).order("sort_order").order("created_at");
+      // Colonne « gallery » absente : le script landpack-galerie.sql n'a pas encore été lancé ; le reste de l'admin fonctionne.
+      const prods = withGallery.error ? await adminDb.from("products").select(prodCols).order("sort_order").order("created_at") : withGallery;
+      setGalleryOk(!withGallery.error);
+      return [await cReq, prods] as const;
+    };
 
     let [c, p] = await fetchAll();
     const err = c.error ?? p.error;
@@ -1009,7 +1014,7 @@ function CatalogueTab({ ctx }: { ctx: Ctx }) {
       {cats.map((c, i) => {
         const group = models.filter((m) => m.category_id === c.id).sort(byOrder);
         return (
-          <CategoryBlock key={c.id} cat={c} position={i + 1} models={group} ctx={ctx} reload={load} ordering={ordering} onMoveModel={(id, to) => moveModel(c.id, id, to)} />
+          <CategoryBlock key={c.id} cat={c} position={i + 1} models={group} ctx={ctx} reload={load} ordering={ordering} onMoveModel={(id, to) => moveModel(c.id, id, to)} galleryOk={galleryOk} />
         );
       })}
     </div>
@@ -1083,8 +1088,8 @@ function Labeled({ text, children }: { text: string; children: React.ReactNode }
 }
 
 function CategoryBlock({
-  cat, position, models, ctx, reload, ordering, onMoveModel,
-}: { cat: CatRow; position: number; models: ModelRow[]; ctx: Ctx; reload: () => Promise<void>; ordering: boolean; onMoveModel: (id: string, to: MoveTo) => void }) {
+  cat, position, models, ctx, reload, ordering, onMoveModel, galleryOk,
+}: { cat: CatRow; position: number; models: ModelRow[]; ctx: Ctx; reload: () => Promise<void>; ordering: boolean; onMoveModel: (id: string, to: MoveTo) => void; galleryOk: boolean }) {
   const [c, setC] = useState(cat);
   const [busy, setBusy] = useState(false);
   const set = <K extends keyof Category>(k: K, v: Category[K]) => setC((x) => ({ ...x, [k]: v }));
@@ -1169,7 +1174,7 @@ function CategoryBlock({
         {models.map((m, i) => (
           <ModelCard
             key={m.id} item={m} ctx={ctx} reload={reload} nextOrder={nextOrder} onDuplicated={setJustAdded} startOpen={justAdded === "__dernier__" && m.id === newestId}
-            position={i + 1} total={models.length} ordering={ordering} onMove={(to) => onMoveModel(m.id, to)}
+            position={i + 1} total={models.length} ordering={ordering} onMove={(to) => onMoveModel(m.id, to)} galleryOk={galleryOk}
           />
         ))}
         <NewModelPanel cat={c} nextOrder={nextOrder} ctx={ctx} reload={reload} onAdded={setJustAdded} />
@@ -1180,11 +1185,116 @@ function CategoryBlock({
 
 const money2 = (n: number | null | undefined) => (n == null ? "sur devis" : `${Number(n).toFixed(2).replace(".", ",")} Dh`);
 
+type GalleryChange = { gallery: string[]; image_url?: string };
+
+// Photos supplémentaires d'un modèle : ajout de plusieurs photos d'un coup, déplacement, photo principale, retrait.
+function GalleryField({
+  main, value, enabled, onApply, ctx,
+}: { main: string; value: string[]; enabled: boolean; onApply: (c: GalleryChange) => Promise<boolean>; ctx: Ctx }) {
+  const [busy, setBusy] = useState(false);
+  const [progress, setProgress] = useState("");
+  const room = MAX_GALLERY - value.length;
+  const tile = "inline-flex h-9 min-w-9 items-center justify-center rounded-md border border-ink/15 bg-white px-2 text-xs font-semibold text-ink hover:bg-paper disabled:cursor-not-allowed disabled:opacity-35";
+
+  async function addFiles(list: FileList | null) {
+    const files = [...(list ?? [])];
+    if (files.length === 0 || busy) return;
+    const take = files.slice(0, Math.max(0, room));
+    setBusy(true);
+    const urls: string[] = [];
+    for (let k = 0; k < take.length; k++) {
+      setProgress(`Optimisation et envoi : photo ${k + 1} sur ${take.length}…`);
+      try {
+        urls.push((await uploadImage(take[k], "products", "product")).url);
+      } catch (e) {
+        ctx.notify(`« ${take[k].name} » : ${e instanceof Error ? e.message : "envoi impossible."}`, false);
+      }
+    }
+    setProgress("");
+    if (urls.length > 0) await onApply({ gallery: [...value, ...urls] });
+    if (files.length > take.length) ctx.notify(`${take.length} photo(s) ajoutée(s) : la galerie est limitée à ${MAX_GALLERY} photos supplémentaires.`, false);
+    setBusy(false);
+  }
+
+  async function run(change: GalleryChange) {
+    setBusy(true);
+    await onApply(change);
+    setBusy(false);
+  }
+
+  function swap(i: number, j: number) {
+    if (j < 0 || j >= value.length) return;
+    const next = [...value];
+    [next[i], next[j]] = [next[j], next[i]];
+    run({ gallery: next });
+  }
+
+  if (!enabled) {
+    return (
+      <p className="rounded-lg bg-kraft/40 p-3 text-xs leading-relaxed text-ink">
+        La galerie de photos n&apos;est pas encore activée sur votre base de données. Dans Supabase, ouvrez <strong>SQL Editor</strong>, collez le contenu du fichier <strong>landpack-galerie.sql</strong>, cliquez sur <strong>Run</strong>, puis rechargez cette page.
+      </p>
+    );
+  }
+
+  return (
+    <div className="space-y-3">
+      <p className="text-xs leading-relaxed text-ink-soft">
+        La photo principale ci-dessus s&apos;affiche sur les cartes. Ces photos apparaissent en petites miniatures sous la grande photo, sur la fiche de l&apos;article : le client clique sur une miniature pour la voir en grand.
+        Jusqu&apos;à {MAX_GALLERY} photos, enregistrées tout de suite. Chaque photo est automatiquement adaptée en carré et allégée.
+      </p>
+      <ul className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
+        {value.map((url, i) => (
+          <li key={url} className="min-w-0 rounded-xl border border-ink/10 bg-white p-2">
+            <div className="aspect-square overflow-hidden rounded-lg border border-ink/10 bg-white">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src={url} alt={`Photo ${i + 1} de la galerie`} className="h-full w-full object-contain" />
+            </div>
+            <div className="mt-2 flex items-center gap-1.5">
+              <button type="button" className={tile} disabled={busy || i === 0} onClick={() => swap(i, i - 1)} aria-label={`Déplacer la photo ${i + 1} vers la gauche`} title="Vers la gauche">←</button>
+              <button type="button" className={tile} disabled={busy || i === value.length - 1} onClick={() => swap(i, i + 1)} aria-label={`Déplacer la photo ${i + 1} vers la droite`} title="Vers la droite">→</button>
+              <span className="ml-auto text-xs text-ink-soft">N° {i + 1}</span>
+            </div>
+            <button
+              type="button"
+              className={`${tile} mt-1.5 w-full`}
+              disabled={busy}
+              onClick={() => run({ gallery: value.map((u, j) => (j === i ? main : u)).filter(Boolean), image_url: url })}
+              title="Cette photo devient la photo principale (celle des cartes)"
+            >
+              Mettre en photo principale
+            </button>
+            <button
+              type="button"
+              className="mt-1.5 inline-flex h-9 w-full items-center justify-center rounded-md border border-red-200 bg-white px-2 text-xs font-semibold text-red-700 hover:bg-red-50 disabled:opacity-40"
+              disabled={busy}
+              onClick={() => confirm("Retirer cette photo de la galerie ?") && run({ gallery: value.filter((_, j) => j !== i) })}
+            >
+              Retirer
+            </button>
+          </li>
+        ))}
+        {room > 0 && (
+          <li className="min-w-0">
+            <label className={`flex aspect-square cursor-pointer flex-col items-center justify-center gap-1 rounded-xl border-2 border-dashed border-ink/25 bg-white p-2 text-center text-xs font-semibold text-ink transition-colors hover:bg-paper ${busy ? "pointer-events-none opacity-60" : ""}`}>
+              <span className="text-2xl leading-none text-water" aria-hidden>+</span>
+              Ajouter des photos
+              <span className="font-normal text-ink-soft">({room} place{room > 1 ? "s" : ""} libre{room > 1 ? "s" : ""})</span>
+              <input type="file" accept="image/*" multiple className="hidden" disabled={busy} onChange={(e) => { addFiles(e.target.files); e.target.value = ""; }} />
+            </label>
+          </li>
+        )}
+      </ul>
+      {progress && <p role="status" className="text-xs font-semibold text-water">{progress}</p>}
+    </div>
+  );
+}
+
 function ModelCard({
-  item, ctx, reload, nextOrder, onDuplicated, startOpen, position, total, ordering, onMove,
+  item, ctx, reload, nextOrder, onDuplicated, startOpen, position, total, ordering, onMove, galleryOk,
 }: {
   item: ModelRow; ctx: Ctx; reload: () => Promise<void>; nextOrder: number; onDuplicated: (id: string) => void; startOpen: boolean;
-  position: number; total: number; ordering: boolean; onMove: (to: MoveTo) => void;
+  position: number; total: number; ordering: boolean; onMove: (to: MoveTo) => void; galleryOk: boolean;
 }) {
   const [m, setM] = useState(item);
   const [busy, setBusy] = useState(false);
@@ -1210,6 +1320,21 @@ function ModelCard({
     setBusy(false);
   }
 
+  // Galerie : chaque ajout, déplacement ou retrait est enregistré tout de suite (le site est mis à jour aussitôt).
+  async function applyGallery(next: { gallery: string[]; image_url?: string }) {
+    const { error } = await adminDb
+      .from("products")
+      .update({ gallery: next.gallery, ...(next.image_url !== undefined ? { image_url: next.image_url } : {}) })
+      .eq("id", m.id);
+    if (error) {
+      ctx.notify(/gallery/i.test(error.message) ? "La galerie n'est pas encore activée : lancez le fichier landpack-galerie.sql dans Supabase (SQL Editor)." : "Erreur : " + error.message, false);
+      return false;
+    }
+    setM((x) => ({ ...x, gallery: next.gallery, ...(next.image_url !== undefined ? { image_url: next.image_url } : {}) }));
+    ctx.notify("Photos enregistrées : le site est à jour.");
+    return true;
+  }
+
   // Copie ce modèle (même photo, même prix) pour créer vite un autre format, par exemple un sac kraft d'une autre dimension.
   async function duplicate() {
     setBusy(true);
@@ -1219,6 +1344,7 @@ function ModelCard({
       dimensions: "",
       description: m.description?.trim() || null,
       image_url: m.image_url,
+      ...(galleryOk ? { gallery: cleanGallery(m.gallery) } : {}),
       unit_price: m.unit_price,
       min_qty: m.min_qty,
       sort_order: nextOrder,
@@ -1283,6 +1409,10 @@ function ModelCard({
             autoSave={async (url) => (await adminDb.from("products").update({ image_url: url }).eq("id", m.id)).error?.message ?? null}
           />
         </Labeled>
+        <div>
+          <span className="mb-1 block text-xs font-medium text-ink-soft">Photos supplémentaires de l&apos;article (galerie)</span>
+          <GalleryField main={m.image_url ?? ""} value={cleanGallery(m.gallery)} enabled={galleryOk} onApply={applyGallery} ctx={ctx} />
+        </div>
         <div className="grid gap-3 sm:grid-cols-2">
           <Labeled text="Prix par pièce, en Dh (ex. 1.20). Vide : « sur devis »">
             <input className={input} type="number" min={0} step="0.01" inputMode="decimal" value={m.unit_price ?? ""} onChange={(e) => set("unit_price", e.target.value === "" ? null : Number(e.target.value))} />

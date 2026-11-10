@@ -8,6 +8,8 @@ export default function Pic({
   preset = "generic",
   className,
   priority = false,
+  onLoad,
+  "aria-hidden": ariaHidden,
 }: {
   src: string;
   alt: string;
@@ -16,6 +18,8 @@ export default function Pic({
   preset?: ImagePreset;
   className?: string;
   priority?: boolean;
+  onLoad?: () => void;
+  "aria-hidden"?: boolean;
 }) {
   const set = srcSetFor(src, preset);
   return (
@@ -28,6 +32,8 @@ export default function Pic({
       loading={priority ? "eager" : "lazy"}
       fetchPriority={priority ? "high" : undefined}
       decoding="async"
+      onLoad={onLoad}
+      aria-hidden={ariaHidden}
       className={className}
     />
   );

@@ -3,6 +3,7 @@
 // le site ne casse donc jamais.
 
 import { cache } from "react";
+import { cleanGallery } from "./gallery";
 import { createClient } from "@supabase/supabase-js";
 import { DEF_BY_ID } from "./content";
 import { DEFAULT_CATEGORIES, DEFAULT_SETTINGS, defaultProducts, type Product } from "./defaults";
@@ -117,17 +118,21 @@ export const getCatalogue = cache(async (): Promise<CatalogueCategory[]> => {
   try {
     const client = db();
     if (!client) return fallbackCatalogue();
-    const [cats, prods] = await Promise.all([
+    const PRODUCT_COLS = "id,category_id,name,dimensions,description,image_url,unit_price,price_label,min_qty,custom_price_label,custom_min_qty,is_active,sort_order";
+    const readProducts = (cols: string) => client.from("products").select(cols).order("sort_order").order("created_at");
+    const [cats, withGallery] = await Promise.all([
       client.from("categories").select("id,slug,name,description,image_url,is_active,sort_order").order("sort_order"),
-      client
-        .from("products")
-        .select("id,category_id,name,dimensions,description,image_url,unit_price,price_label,min_qty,custom_price_label,custom_min_qty,is_active,sort_order")
-        .order("sort_order")
-        .order("created_at"),
+      readProducts(`${PRODUCT_COLS},gallery`),
     ]);
+    // Si le script landpack-galerie.sql n'a pas encore été lancé, la colonne « gallery » n'existe pas : on lit sans elle.
+    const prods = withGallery.error ? await readProducts(PRODUCT_COLS) : withGallery;
     if (cats.error || prods.error || !cats.data?.length) return fallbackCatalogue();
 
-    const products = ((prods.data ?? []) as Product[]).map((p) => ({ ...p, unit_price: p.unit_price == null ? null : Number(p.unit_price) }));
+    const products = ((prods.data ?? []) as unknown as Product[]).map((p) => ({
+      ...p,
+      unit_price: p.unit_price == null ? null : Number(p.unit_price),
+      gallery: cleanGallery(p.gallery),
+    }));
     return cats.data
       .filter((c) => c.is_active)
       .map((c) => ({
