@@ -5,6 +5,7 @@ import Header from "../../components/Header";
 import Footer from "../../components/Footer";
 import Breadcrumb from "../../components/Breadcrumb";
 import ProductCard from "../../components/ProductCard";
+import CategoryFaq from "../../components/CategoryFaq";
 import { getCatalogue, getCategory, getSettings } from "@/lib/data";
 import { rulesFrom } from "@/lib/pricing";
 import { pageMetadata } from "@/lib/seo";
@@ -55,6 +56,8 @@ export default async function CategoryPage({ params }: Params) {
             <ProductCard key={p.id ?? p.name} item={p} id={p.id ?? `${category.slug}-${i + 1}`} rules={rules} />
           ))}
         </div>
+
+        <CategoryFaq name={category.name} items={category.items} rules={rules} settings={settings} />
 
         <section className="mt-12 border-t border-ink/10 pt-8 sm:mt-16">
           <h2 className="font-display text-xl text-ink">Autres catégories</h2>

@@ -4,17 +4,19 @@ import Footer from "./components/Footer";
 import Slider from "./components/Slider";
 import ProductCard from "./components/ProductCard";
 import HowToOrder from "./components/HowToOrder";
+import AboutSection from "./components/AboutSection";
 import Pic from "./components/Pic";
 import { getCatalogue, getList, getSettings, getText } from "@/lib/data";
 import { rulesFrom } from "@/lib/pricing";
 
 export default async function Home() {
-  const [slides, categories, stepsHead, steps, settings] = await Promise.all([
+  const [slides, categories, stepsHead, steps, settings, about] = await Promise.all([
     getList("home.slides"),
     getCatalogue(),
     getText("home.steps_head"),
     getList("home.steps"),
     getSettings(),
+    getText("home.about"),
   ]);
   const rules = rulesFrom(settings);
 
@@ -90,6 +92,8 @@ export default async function Home() {
         ))}
 
         <HowToOrder title={stepsHead.title} text={stepsHead.text} steps={steps.map((x) => ({ title: x.title, text: x.text }))} />
+
+        {about.title && <AboutSection title={about.title} text={about.text} rules={rules} settings={settings} />}
       </main>
       <Footer />
     </>

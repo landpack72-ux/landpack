@@ -92,7 +92,7 @@ export const SECTION_DEFS: SectionDef[] = [
     ],
     defaults: [{
       title: "Emballages alimentaires personnalisés au Maroc | Landpack",
-      description: "Landpack personnalise vos emballages alimentaires à votre logo : boîtes pizza et lunch, sachets, sacs kraft, gobelets plastiques et kraft, cartons. Impression de votre logo sur chaque article. Atelier à Casablanca, livraison partout au Maroc.",
+      description: "Landpack personnalise vos emballages alimentaires à votre logo : boîtes pizza et lunch, sachets, sacs kraft, gobelets plastiques et kraft, cartons. Impression de votre logo sur chaque article. Boutique à Sidi Maârouf, Casablanca, livraison partout au Maroc.",
       keywords: "emballage alimentaire personnalisé Maroc, boîte pizza personnalisée, boîte lunch personnalisée, sachet alimentaire personnalisé, sac kraft personnalisé, gobelet personnalisé Maroc, gobelet kraft, carton personnalisé, emballage avec logo Casablanca, Landpack",
     }] },
   { id: "home.slides", page: "home", label: "Diaporama (grande bannière en haut de l'accueil)", mode: "list",
@@ -103,6 +103,13 @@ export const SECTION_DEFS: SectionDef[] = [
       { image: "/images/perso.webp", title: "Votre logo sur chaque emballage", text: "Choisissez le modèle, envoyez votre logo en commandant : nous l'imprimons.", cta: "Voir les sacs kraft", href: "/categorie/sacs-kraft" },
       { image: "/images/surmesure.webp", title: "Votre marque sur chaque détail", text: "Gobelets, boîtes, sachets et sacs : tout est imprimé à votre logo.", cta: "Voir les gobelets", href: "/categorie/gobelets-plastiques" },
     ] },
+  { id: "home.about", page: "home", label: "Présentation de Landpack (texte en bas de l'accueil, utile pour Google)", mode: "single",
+    hint: "Laissez une ligne vide entre deux paragraphes.",
+    fields: [T("title", "Titre"), A("text", "Texte")],
+    defaults: [{
+      title: "Emballages alimentaires personnalisés à Casablanca",
+      text: "Landpack imprime votre logo sur vos emballages alimentaires : boîtes à pizza et lunch, sachets, sacs kraft, gobelets plastiques et kraft, et cartons. Nos clients sont des restaurants, snacks, pizzerias, boulangeries, traiteurs et commerces de bouche partout au Maroc.\n\nChoisissez votre modèle et votre quantité en ligne, chargez votre logo, puis nous vous appelons pour confirmer la commande. Vous préférez voir les produits ? Passez nous voir à la boutique de Sidi Maârouf, près du rond-point Moustakbal.",
+    }] },
   { id: "home.steps_head", page: "home", label: "Comment commander : titre", mode: "single",
     fields: [T("title", "Titre"), A("text", "Texte")],
     defaults: [{ title: "Comment commander", text: "Trois étapes pour recevoir vos emballages à votre image." }] },

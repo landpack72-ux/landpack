@@ -32,13 +32,23 @@ export const DEFAULT_SETTINGS: Record<string, string> = {
   phone: "+212673326244",
   whatsapp: "212673326244",
   email: "",
-  address: "Sidi Maârouf, Rond-Point Moustakbal, Casablanca",
+  address: "08 Rue 70, Lotissement Hamza Hafid El Khair, Sidi Maârouf, Casablanca 21000",
   logo_url: "/assets/logo.webp",
   // Règles de prix (modifiables dans l'admin : Catalogue > Tarifs et remises)
   qty_min: "50",
   qty_step: "50",
   discount_threshold: "1000",
   discount_percent: "15",
+  // Boutique et référencement (admin : Coordonnées & logo > Boutique, horaires et référencement)
+  maps_url: "",
+  shop_landmarks: "Entrée Hamza, à côté de la boulangerie Croustillant, près du rond-point Moustakbal",
+  hours_open: "08:30",
+  hours_close: "18:00",
+  hours_days: "",
+  social_facebook: "",
+  social_instagram: "",
+  social_tiktok: "",
+  google_verification: "",
   // Informations légales (à compléter dans l'admin : Coordonnées & logo > Informations légales)
   legal_name: "",
   legal_form: "",
@@ -57,12 +67,12 @@ export const DEFAULT_SETTINGS: Record<string, string> = {
 // Six catégories, six modèles chacune. Les dimensions et photos sont des EXEMPLES
 // à remplacer depuis l'admin (Catalogue).
 export const DEFAULT_CATEGORIES: Category[] = [
-  { slug: "boites", name: "Boîtes (pizza, lunch…)", description: "Boîtes alimentaires en carton, pour pizzas, repas à emporter et plus, imprimées à votre logo.", image_url: "/images/boitekraft.webp", sort_order: 0, is_active: true },
-  { slug: "sachets", name: "Sachets", description: "Sachets alimentaires personnalisés : pâtisseries, sandwichs, snacks.", image_url: "/images/surmesure2.webp", sort_order: 1, is_active: true },
-  { slug: "sacs-kraft", name: "Sacs kraft", description: "Sacs kraft avec poignées, imprimés à votre logo.", image_url: "/images/sackraft.webp", sort_order: 2, is_active: true },
-  { slug: "gobelets-plastiques", name: "Gobelets plastiques", description: "Gobelets transparents personnalisés pour boissons froides.", image_url: "/images/gobletsplast.webp", sort_order: 3, is_active: true },
-  { slug: "gobelets-kraft", name: "Gobelets kraft", description: "Gobelets en carton kraft pour boissons chaudes et froides, imprimés à votre logo.", image_url: "/images/goblets.webp", sort_order: 4, is_active: true },
-  { slug: "cartons", name: "Cartons", description: "Cartons d'expédition et de transport, personnalisables à votre marque.", image_url: "/images/boitecraft.webp", sort_order: 5, is_active: true },
+  { slug: "boites", name: "Boîtes (pizza, lunch…)", description: "Boîtes à pizza et boîtes lunch en carton, imprimées à votre logo, en plusieurs formats pour vos pizzas, sandwichs, burgers et plats à emporter.", image_url: "/images/boitekraft.webp", sort_order: 0, is_active: true },
+  { slug: "sachets", name: "Sachets", description: "Sachets alimentaires personnalisés à votre logo, en plusieurs dimensions, pour le pain, les pâtisseries, les sandwichs et les snacks.", image_url: "/images/surmesure2.webp", sort_order: 1, is_active: true },
+  { slug: "sacs-kraft", name: "Sacs kraft", description: "Sacs kraft avec poignées, imprimés à votre logo, en plusieurs dimensions pour vos ventes à emporter, votre boutique et vos livraisons.", image_url: "/images/sackraft.webp", sort_order: 2, is_active: true },
+  { slug: "gobelets-plastiques", name: "Gobelets plastiques", description: "Gobelets plastiques transparents personnalisés à votre logo pour boissons froides, jus et smoothies, en plusieurs contenances.", image_url: "/images/gobletsplast.webp", sort_order: 3, is_active: true },
+  { slug: "gobelets-kraft", name: "Gobelets kraft", description: "Gobelets en carton kraft imprimés à votre logo, pour boissons chaudes et froides selon le modèle, en plusieurs contenances.", image_url: "/images/goblets.webp", sort_order: 4, is_active: true },
+  { slug: "cartons", name: "Cartons", description: "Cartons d'expédition et de transport personnalisables à votre marque, en plusieurs dimensions pour vos livraisons et vos envois.", image_url: "/images/boitecraft.webp", sort_order: 5, is_active: true },
 ];
 
 export const DEFAULT_MODELS: Record<string, { name: string; dimensions: string; image: string }[]> = {

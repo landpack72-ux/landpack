@@ -39,9 +39,9 @@ export default function Slider({ slides }: { slides: Slide[] }) {
           <Pic src={s.image} alt="" preset="slide" priority={i === 0} sizes="(min-width: 1280px) 1200px, 100vw" className="h-full w-full object-cover" />
           <div className="absolute inset-0 bg-gradient-to-r from-black/70 via-black/35 to-transparent" />
           <div className="absolute inset-0 flex items-center">
-            <div className="max-w-xl px-5 sm:px-12">
-              <p className="font-display text-xl leading-tight text-white sm:text-4xl">{s.title}</p>
-              {s.text && <p className="mt-3 hidden font-body text-sm text-white/90 sm:block sm:text-base">{s.text}</p>}
+            <div className="min-w-0 max-w-xl px-5 [overflow-wrap:anywhere] sm:px-12">
+              <p className="font-display text-xl leading-tight text-white [overflow-wrap:anywhere] sm:text-4xl">{s.title}</p>
+              {s.text && <p className="mt-3 hidden font-body text-sm text-white/90 [overflow-wrap:anywhere] sm:block sm:text-base">{s.text}</p>}
               {s.cta && s.href && (
                 <a
                   href={s.href}

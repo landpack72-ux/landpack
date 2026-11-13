@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { openingSpec, safeUrl, socialLinks, splitAddress } from "@/lib/shop";
 import "@fontsource/sora/600.css";
 import "@fontsource/sora/700.css";
 import "@fontsource/sora/800.css";
@@ -47,6 +48,8 @@ export async function generateMetadata(): Promise<Metadata> {
     description: seo.description,
     keywords: (seo.keywords ?? "").split(",").map((k) => k.trim()).filter(Boolean),
     alternates: { canonical: "/" },
+    // Vérification Google Search Console par balise (champ « Search Console » de l'admin), seulement si renseigné.
+    ...(s.google_verification?.trim() ? { verification: { google: s.google_verification.trim() } } : {}),
     robots: {
       index: true,
       follow: true,
@@ -94,6 +97,9 @@ export default async function RootLayout({
     },
   }));
 
+  // Pages de Landpack ailleurs sur le web (Google Maps, réseaux) : relie le site à ces profils.
+  const sameAs = [safeUrl(s.maps_url), ...socialLinks(s).map((x) => x.url)].filter((x): x is string => !!x);
+
   const jsonLd = {
     "@context": "https://schema.org",
     "@type": ["LocalBusiness", "Store"],
@@ -107,15 +113,17 @@ export default async function RootLayout({
     telephone: s.phone,
     ...(s.email ? { email: s.email } : {}),
     founder: { "@type": "Person", name: "Fayesall" },
-    priceRange: "$$",
     currenciesAccepted: "MAD",
-    paymentAccepted: "Cash, Bank transfer",
     address: {
       "@type": "PostalAddress",
-      streetAddress: s.address.replace(/,?\s*Casablanca$/i, ""),
+      streetAddress: splitAddress(s.address).street,
+      ...(splitAddress(s.address).postalCode ? { postalCode: splitAddress(s.address).postalCode } : {}),
       addressLocality: "Casablanca",
       addressCountry: "MA",
     },
+    ...(openingSpec(s) ? { openingHoursSpecification: openingSpec(s) } : {}),
+    ...(safeUrl(s.maps_url) ? { hasMap: safeUrl(s.maps_url) } : {}),
+    ...(sameAs.length > 0 ? { sameAs } : {}),
     areaServed: [
       { "@type": "Country", name: "Maroc" },
       { "@type": "City", name: "Casablanca" },

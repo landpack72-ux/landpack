@@ -9,6 +9,7 @@ import { uploadImage } from "./image";
 import { PRESETS, type ImagePreset } from "@/lib/images";
 import { CONSENT_LINE_RE, LEGAL_FIELDS, legalMissing } from "@/lib/legal";
 import { MAX_GALLERY, cleanGallery } from "@/lib/gallery";
+import { DAYS, SOCIALS, hoursText, parseDays, safeUrl } from "@/lib/shop";
 
 type Row<T> = T & { id: string };
 type SectionRow = {
@@ -1702,6 +1703,76 @@ function SettingsTab({ ctx }: { ctx: Ctx }) {
           Image convertie en WebP (le fond transparent est conservé). Par défaut, le site utilise le fichier public/assets/logo.webp.
         </p>
       </div>
+      <section className="rounded-xl border border-ink/10 bg-white p-4">
+        <h3 className="font-display text-lg text-ink">Boutique, horaires et référencement</h3>
+        <p className="mt-1 text-xs leading-relaxed text-ink-soft">
+          Ces informations s&apos;affichent dans le pied de page du site et sont transmises à Google : elles doivent être <strong>identiques à votre fiche Google Maps</strong>.
+        </p>
+        <div className="mt-4 space-y-4">
+          <label className="block">
+            <span className="mb-1 block text-sm font-medium">Lien Google Maps de la boutique (bouton « Voir sur Google Maps »)</span>
+            <input className={input} value={values.maps_url ?? ""} placeholder="https://maps.app.goo.gl/…" onChange={(e) => setValues({ ...values, maps_url: e.target.value })} />
+            <span className="mt-1 block text-xs text-ink-soft">Dans votre fiche Google : menu ⋮ puis « Share profile » (partager le profil), et copiez le lien.</span>
+            {values.maps_url?.trim() && !safeUrl(values.maps_url) && <span className="mt-1 block text-xs font-semibold text-red-700">Cette adresse doit commencer par https://</span>}
+          </label>
+          <label className="block">
+            <span className="mb-1 block text-sm font-medium">Repères pour trouver la boutique</span>
+            <input className={input} value={values.shop_landmarks ?? ""} onChange={(e) => setValues({ ...values, shop_landmarks: e.target.value })} />
+          </label>
+
+          <div>
+            <span className="mb-1 block text-sm font-medium">Horaires d&apos;ouverture de la boutique</span>
+            <div className="flex flex-wrap items-center gap-3">
+              <label className="flex items-center gap-2 text-sm">
+                De <input type="time" className={`${input} w-32`} value={values.hours_open ?? ""} onChange={(e) => setValues({ ...values, hours_open: e.target.value })} />
+              </label>
+              <label className="flex items-center gap-2 text-sm">
+                à <input type="time" className={`${input} w-32`} value={values.hours_close ?? ""} onChange={(e) => setValues({ ...values, hours_close: e.target.value })} />
+              </label>
+            </div>
+            <div className="mt-3 flex flex-wrap gap-2" role="group" aria-label="Jours d'ouverture">
+              {DAYS.map((d) => {
+                const on = parseDays(values.hours_days).includes(d.code);
+                return (
+                  <label key={d.code} className={`flex cursor-pointer items-center gap-2 rounded-lg border px-3 py-2 text-sm font-medium ${on ? "border-water bg-paper text-ink" : "border-ink/15 bg-white text-ink-soft"}`}>
+                    <input
+                      type="checkbox"
+                      checked={on}
+                      onChange={(e) => {
+                        const set = new Set(parseDays(values.hours_days));
+                        if (e.target.checked) set.add(d.code);
+                        else set.delete(d.code);
+                        setValues({ ...values, hours_days: DAYS.filter((x) => set.has(x.code)).map((x) => x.code).join(",") });
+                      }}
+                    />
+                    {d.label.charAt(0).toUpperCase() + d.label.slice(1)}
+                  </label>
+                );
+              })}
+            </div>
+            <p className="mt-2 text-xs text-ink-soft">
+              {parseDays(values.hours_days).length === 0
+                ? "Cochez les jours où la boutique est ouverte : sans eux, les horaires ne sont pas transmis à Google."
+                : <>Affiché sur le site : <strong className="text-ink">{hoursText(values) ?? "—"}</strong></>}
+            </p>
+          </div>
+
+          {SOCIALS.map((x) => (
+            <label key={x.key} className="block">
+              <span className="mb-1 block text-sm font-medium">Page {x.label} (adresse complète, facultatif)</span>
+              <input className={input} value={values[x.key] ?? ""} placeholder="https://…" onChange={(e) => setValues({ ...values, [x.key]: e.target.value })} />
+              {values[x.key]?.trim() && !safeUrl(values[x.key]) && <span className="mt-1 block text-xs font-semibold text-red-700">Cette adresse doit commencer par https://</span>}
+            </label>
+          ))}
+
+          <label className="block">
+            <span className="mb-1 block text-sm font-medium">Google Search Console : code de vérification (facultatif)</span>
+            <input className={input} value={values.google_verification ?? ""} placeholder="Collez seulement le code (la partie après content=)" onChange={(e) => setValues({ ...values, google_verification: e.target.value })} />
+            <span className="mt-1 block text-xs text-ink-soft">Alternative à la ligne DNS : dans Search Console, choisissez la vérification « Balise HTML », et collez ici uniquement la valeur de « content ».</span>
+          </label>
+        </div>
+      </section>
+
       <section className="rounded-xl border border-ink/10 bg-white p-4">
         <h3 className="font-display text-lg text-ink">Informations légales</h3>
         <p className="mt-1 text-xs leading-relaxed text-ink-soft">

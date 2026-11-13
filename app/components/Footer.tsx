@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { getCatalogue, getSettings, getText } from "@/lib/data";
 import { formatPhone, telHref, waHref } from "@/lib/format";
+import { hoursText, safeUrl, socialLinks } from "@/lib/shop";
 import Logo from "./Logo";
 import { PhoneIcon, PinIcon, WhatsAppIcon } from "./icons";
 
@@ -10,6 +11,9 @@ export default async function Footer() {
   const title = "font-body text-sm font-bold uppercase tracking-[0.12em] text-ink";
   const link = "inline-block py-1.5 font-body text-[15px] text-ink hover:text-water hover:underline";
   const contact = "flex items-start gap-3 py-1.5 font-body text-[15px] text-ink";
+  const hours = hoursText(s);
+  const mapsUrl = safeUrl(s.maps_url);
+  const socials = socialLinks(s);
 
   return (
     <footer className="mt-10 border-t-4 border-kraft bg-[#f0efeb] text-ink sm:mt-14">
@@ -45,8 +49,24 @@ export default async function Footer() {
           <ul className="mt-3">
             <li className={contact}>
               <PinIcon className="mt-0.5 h-5 w-5 shrink-0 text-water" />
-              <span>{s.address}</span>
+              <span>
+                {s.address}
+                {s.shop_landmarks?.trim() && <span className="mt-0.5 block text-sm text-ink-soft">{s.shop_landmarks.trim()}</span>}
+              </span>
             </li>
+            {hours && (
+              <li className="py-1.5 pl-8 font-body text-[15px] text-ink">
+                <span className="font-semibold">Boutique ouverte</span>
+                <span className="block text-ink-soft">{hours.charAt(0).toUpperCase() + hours.slice(1)}</span>
+              </li>
+            )}
+            {mapsUrl && (
+              <li className="pl-8">
+                <a href={mapsUrl} target="_blank" rel="noopener noreferrer" className="inline-block py-1.5 font-body text-[15px] font-semibold text-water underline hover:text-water-dark">
+                  Voir sur Google Maps
+                </a>
+              </li>
+            )}
             <li>
               <a href={telHref(s.phone)} className={`${contact} hover:text-water`}>
                 <PhoneIcon className="mt-0.5 h-5 w-5 shrink-0 text-water" />
@@ -64,6 +84,15 @@ export default async function Footer() {
                 <a href={`mailto:${s.email}`} className={`${contact} hover:text-water`}>
                   <span>{s.email}</span>
                 </a>
+              </li>
+            )}
+            {socials.length > 0 && (
+              <li className="flex flex-wrap items-center gap-x-4 gap-y-1 pt-2">
+                {socials.map((x) => (
+                  <a key={x.label} href={x.url} target="_blank" rel="noopener noreferrer me" className="py-1.5 font-body text-[15px] font-semibold text-ink hover:text-water hover:underline">
+                    {x.label}
+                  </a>
+                ))}
               </li>
             )}
           </ul>
