@@ -49,19 +49,29 @@ export default async function ProductPage({ params }: Params) {
 
   const images = allImages(p.image_url, p.gallery);
 
-  const jsonLd = {
-    "@context": "https://schema.org",
-    "@type": "Product",
-    name: title,
-    sku: p.id,
-    category: c.name,
-    brand: { "@type": "Brand", name: "Landpack" },
-    description: p.description || `${title} : ${c.name} personnalisés à votre logo.`,
-    ...(images.length > 0 ? { image: images.length === 1 ? absoluteUrl(images[0]) : images.map(absoluteUrl) } : {}),
-    ...(p.unit_price != null
-      ? { offers: { "@type": "Offer", priceCurrency: "MAD", price: p.unit_price.toFixed(2), availability: "https://schema.org/InStock", url: absoluteUrl(`/produit/${p.id}`) } }
-      : {}),
-  };
+  // Google exige qu'une fiche "Product" contienne au moins "offers", "review" ou "aggregateRating".
+  // Les articles "sur devis" (sans prix fixe, p.unit_price == null) n'ont aucun de ces trois champs :
+  // on n'émet donc pas de balise Product pour eux, plutôt qu'une fiche invalide (ni de faux prix inventé).
+  const jsonLd =
+    p.unit_price != null
+      ? {
+          "@context": "https://schema.org",
+          "@type": "Product",
+          name: title,
+          sku: p.id,
+          category: c.name,
+          brand: { "@type": "Brand", name: "Landpack" },
+          description: p.description || `${title} : ${c.name} personnalisés à votre logo.`,
+          ...(images.length > 0 ? { image: images.length === 1 ? absoluteUrl(images[0]) : images.map(absoluteUrl) } : {}),
+          offers: {
+            "@type": "Offer",
+            priceCurrency: "MAD",
+            price: p.unit_price.toFixed(2),
+            availability: "https://schema.org/InStock",
+            url: absoluteUrl(`/produit/${p.id}`),
+          },
+        }
+      : null;
 
   const rows: [string, string][] = [
     ...(p.dimensions ? ([["Dimensions", p.dimensions]] as [string, string][]) : []),
@@ -148,11 +158,13 @@ export default async function ProductPage({ params }: Params) {
         )}
       </main>
       <Footer />
-      <script
-        type="application/ld+json"
-        // "<" est échappé : aucun contenu saisi dans l'admin ne peut refermer la balise <script>.
-        dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd).replace(/</g, "\\u003c") }}
-      />
+      {jsonLd && (
+        <script
+          type="application/ld+json"
+          // "<" est échappé : aucun contenu saisi dans l'admin ne peut refermer la balise <script>.
+          dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd).replace(/</g, "\\u003c") }}
+        />
+      )}
     </>
   );
 }
