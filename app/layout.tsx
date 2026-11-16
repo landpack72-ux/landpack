@@ -88,10 +88,13 @@ export default async function RootLayout({
 
   // Le catalogue envoyé à Google est construit à partir du contenu de l'admin :
   // quand le client modifie une catégorie ou un modèle, les données structurées suivent.
+  // "Service" et non "Product" : une catégorie regroupe plusieurs modèles à plusieurs prix,
+  // ce n'est pas un article unique en vente — Google exige "offers"/"review"/"aggregateRating"
+  // pour un "Product", ce qu'une catégorie entière ne peut pas fournir honnêtement.
   const makesOffer = categories.map((c) => ({
     "@type": "Offer",
     itemOffered: {
-      "@type": "Product",
+      "@type": "Service",
       name: `Personnalisation : ${c.name}`,
       description: `${c.description ?? c.name} Modèles : ${c.items.map((p) => p.dimensions).filter(Boolean).join(" ; ")}.`,
     },
